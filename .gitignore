@@ -1,68 +1,144 @@
-# Prerequisites
-*.d
+# ---------------------------------------------------------------------------
+# Build output (CMakePresets.json uses out/build/<preset> and out/install/<preset>)
+# ---------------------------------------------------------------------------
+/out/
+/build/
+/cmake-build-*/
+[Oo]utput/
+[Bb]in/
+[Ll]ib/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+ARM/
+ARM64/
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
+# ---------------------------------------------------------------------------
+# CMake generated files
+# ---------------------------------------------------------------------------
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+Makefile
+*.cmake.stamp
+build.ninja
+.ninja_deps
+.ninja_log
+rules.ninja
+compile_commands.json
+.ninja-*
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.vcproj
+*.vcproj.*.user
+*.xcodeproj/
+*.xcworkspace/
+
+# ---------------------------------------------------------------------------
+# Qt generated files (usually under the build dir, but ignore them anywhere)
+# ---------------------------------------------------------------------------
+ui_*.h
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+qrc_*.h
+*.moc
+*.qm
+.qmake.stash
+*.pro.user
+*.pro.user.*
+*.qmlc
+*.jsc
+*.qmlproject.user
+*.qmlproject.user.*
+.qmlproject.user
+debug/
+release/
+
+# ---------------------------------------------------------------------------
+# Qt Creator / IDE
+# ---------------------------------------------------------------------------
+CMakeLists.txt.user
+CMakeLists.txt.user.*
+*.autosave
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---------------------------------------------------------------------------
+# Dependency managers / package caches
+# ---------------------------------------------------------------------------
+vcpkg_installed/
+vcpkg/
+/conan/
+conanbuildinfo.*
+conaninfo.txt
+CMakeUserPresets.json
+
+# ---------------------------------------------------------------------------
+# Compiler / linker / analysis artifacts
+# ---------------------------------------------------------------------------
 *.obj
-
-# Precompiled Headers
+*.o
+*.lo
+*.ko
+*.so
+*.so.*
+*.dylib
+*.a
+*.la
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.idb
+*.map
+*.d
+*.iobj
+*.ipdb
 *.gch
 *.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-*.so.*
-
-# Fortran module files
+*.dSYM/
+*.su
+*.idb
 *.mod
 *.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
 *.exe
+*.dll
 *.out
 *.app
+*.dSYM.zip
 
-# Build directories
-build/
-Build/
-build-*/
+# ---------------------------------------------------------------------------
+# OS metadata
+# ---------------------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+._*
 
-# CMake generated files
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-install_manifest.txt
-compile_commands.json
-
-# Temporary files
-*.tmp
+# ---------------------------------------------------------------------------
+# Logs and temp files
+# ---------------------------------------------------------------------------
 *.log
-*.bak
-*.swp
-
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
+*.log.*
+*.tmp
+*.temp
+*.cache/
 .cache/
+*.bak
+*.orig
+*.rej
