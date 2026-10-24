@@ -19,6 +19,7 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
     Core
     Gui
     Widgets
+    LinguistTools
 )
 
 add_subdirectory("PeDataSource")

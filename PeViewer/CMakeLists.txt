@@ -7,11 +7,47 @@ set(PROJECT_SOURCES
     PeViewer.ui
     PeViewer.h
     PeViewer.cpp
+    LanguageManager.h
+    LanguageManager.cpp
 )
 
-add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
+set(TS_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/translations/PeViewer_en.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/translations/PeViewer_zh_CN.ts"
+)
+set(QM_FILES)
+set(TRANSLATION_RESOURCE_ENTRIES)
+foreach(TS_FILE IN LISTS TS_FILES)
+    get_filename_component(TRANSLATION_NAME "${TS_FILE}" NAME_WE)
+    set(QM_FILE "${CMAKE_CURRENT_BINARY_DIR}/${TRANSLATION_NAME}.qm")
+    add_custom_command(OUTPUT "${QM_FILE}"
+        COMMAND Qt${QT_VERSION_MAJOR}::lrelease "${TS_FILE}" -nounfinished -qm "${QM_FILE}"
+        DEPENDS "${TS_FILE}"
+        VERBATIM
+    )
+    list(APPEND QM_FILES "${QM_FILE}")
+    string(APPEND TRANSLATION_RESOURCE_ENTRIES
+        "        <file alias=\"${TRANSLATION_NAME}.qm\">${QM_FILE}</file>\n")
+endforeach()
+configure_file(translations.qrc.in translations.qrc @ONLY)
 
-set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+add_custom_target(PeViewer_translations DEPENDS ${QM_FILES})
+add_custom_target(PeViewer_lupdate
+    COMMAND Qt${QT_VERSION_MAJOR}::lupdate ${PROJECT_SOURCES}
+        -no-obsolete -locations relative -ts ${TS_FILES}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Updating PeViewer translation catalogs"
+    VERBATIM
+)
+
+add_executable(${PROJECT_NAME} ${PROJECT_SOURCES}
+    "${CMAKE_CURRENT_BINARY_DIR}/translations.qrc"
+)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    WIN32_EXECUTABLE TRUE
+    AUTORCC ON
+)
+add_dependencies(${PROJECT_NAME} PeViewer_translations)
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
