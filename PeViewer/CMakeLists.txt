@@ -38,17 +38,14 @@ if(WIN32)
         message(FATAL_ERROR "windeployqt.exe was not found in ${QT_BIN_DIR}")
     endif()
 
-    # Keep the prefix unevaluated until installation to support --prefix.
-    install(CODE "
-        execute_process(
-            COMMAND \"${WINDEPLOYQT_EXECUTABLE}\"
-                $<IF:$<CONFIG:Debug>,--debug,--release>
-                \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:${PROJECT_NAME}>\"
-            RESULT_VARIABLE deploy_result
-        )
-        if(NOT \"\${deploy_result}\" STREQUAL \"0\")
-            message(FATAL_ERROR \"windeployqt failed: \${deploy_result}\")
-        endif()
-    ")
+    # Deploy dependencies alongside the executable in the build directory.
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND "${WINDEPLOYQT_EXECUTABLE}"
+            $<IF:$<CONFIG:Debug>,--debug,--release>
+            --dir "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+            "$<TARGET_FILE:${PROJECT_NAME}>"
+        COMMENT "Deploying Qt dependencies for ${PROJECT_NAME}"
+        VERBATIM
+    )
 endif()
 

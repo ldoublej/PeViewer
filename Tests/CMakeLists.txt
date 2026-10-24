@@ -1,0 +1,4 @@
+add_executable(PeDataSourceTests PeDataSourceTests.cpp)
+target_link_libraries(PeDataSourceTests PRIVATE PeDataSource)
+
+add_test(NAME PeDataSourceTests COMMAND PeDataSourceTests)
