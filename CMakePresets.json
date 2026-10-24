@@ -46,6 +46,9 @@
     {
       "hidden": true,
       "name": "Qt",
+      "environment": {
+        "PATH": "$env{QTDIR}/bin;$penv{PATH}"
+      },
       "cacheVariables": {
         "CMAKE_PREFIX_PATH": "$env{QTDIR}"
       }
