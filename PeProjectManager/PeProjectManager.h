@@ -1,7 +1,6 @@
 #pragma once
 
-class PeProjectManager
-{
-public:
+class PeProjectManager {
+   public:
     PeProjectManager();
 };

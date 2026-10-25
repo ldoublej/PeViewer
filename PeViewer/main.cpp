@@ -1,9 +1,9 @@
-#include "PeViewer.h"
-#include "LanguageManager.h"
 #include <QtWidgets/QApplication>
 
-int main(int argc, char *argv[])
-{
+#include "LanguageManager.h"
+#include "PeViewer.h"
+
+int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("PeViewer"));
     QCoreApplication::setApplicationName(QStringLiteral("PeViewer"));

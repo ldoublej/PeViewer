@@ -1,7 +1,6 @@
 #pragma once
 
-class PeParse
-{
-public:
+class PeParse {
+   public:
     PeParse();
 };
