@@ -10,3 +10,5 @@ target_link_libraries(${PROJECT_NAME}
         Qt::Core
         PeDataSource
 )
+
+target_link_libraries(${PROJECT_NAME} PRIVATE PeStructs)

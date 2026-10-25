@@ -21,7 +21,7 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
     Widgets
     LinguistTools
 )
-
+add_subdirectory("PeStructs")
 add_subdirectory("PeDataSource")
 add_subdirectory("PeParse")
 add_subdirectory("PeProjectManager")
