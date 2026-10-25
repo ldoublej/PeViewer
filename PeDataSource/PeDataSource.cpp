@@ -12,10 +12,10 @@ PeDataSourceError::PeDataSourceError(Code code, const QString& message,
 namespace {
 template <typename T>
 T readLittleEndian(const PeDataSource& source, quint64 offset) {
-    const auto bytes = source.readArray<sizeof(T)>(offset);
+    const auto bytes = source.readBytes(offset, sizeof(T));
     T value = 0;
-    for (std::size_t i = 0; i < bytes.size(); ++i)
-        value |= static_cast<T>(bytes[i]) << (i * 8);
+    for (int i = 0; i < bytes.size(); ++i)
+        value |= static_cast<T>(static_cast<quint8>(bytes[i])) << (i * 8);
     return value;
 }
 }  // namespace

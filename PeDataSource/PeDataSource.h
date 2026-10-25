@@ -3,9 +3,7 @@
 #include <QByteArray>
 #include <QString>
 #include <QtGlobal>
-#include <array>
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <type_traits>
@@ -46,13 +44,6 @@ class PeDataSource {
     QByteArray readBytes(quint64 offset, std::size_t count) const;
     QString readAscii(quint64 offset, std::size_t maxLength) const;
     QString readUtf16(quint64 offset, std::size_t maxCodeUnits) const;
-
-    template <std::size_t N>
-    std::array<std::uint8_t, N> readArray(quint64 offset) const {
-        std::array<std::uint8_t, N> result{};
-        readExact(offset, reinterpret_cast<char*>(result.data()), N);
-        return result;
-    }
 
     // T 须为紧凑布局的 PE 结构体，且所有字段均能接受任意字节值。
     // 整数字段按主机字节序解释；跨平台读取标量时应使用 readU*。

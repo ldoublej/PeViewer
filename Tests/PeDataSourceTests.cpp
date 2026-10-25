@@ -1,6 +1,5 @@
 #include <QFile>
 #include <QTemporaryDir>
-#include <array>
 #include <limits>
 #include <stdexcept>
 #include <thread>
@@ -50,7 +49,9 @@ int main() {
     require(source.readBytes(8, 2) == QByteArray("Hi", 2));
     require(source.readAscii(8, 3) == QStringLiteral("Hi"));
     require(source.readUtf16(11, 2) == QStringLiteral("A"));
-    require(source.readArray<2>(0) == (std::array<std::uint8_t, 2>{'M', 'Z'}));
+    require(source.readBytes(0, 2) == QByteArray("MZ", 2));
+    require(source.readBytes(6, 6) == contents.mid(6, 6));
+    require(source.readBytes(100, 0).isEmpty());
 
     source.readExact(100, nullptr, 0);
     expectError(PeDataSourceError::Code::OutOfBounds,
