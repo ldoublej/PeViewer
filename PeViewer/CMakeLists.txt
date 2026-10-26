@@ -12,7 +12,6 @@ set(PROJECT_SOURCES
 )
 
 set(TS_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/PeViewer_en.ts"
     "${CMAKE_CURRENT_SOURCE_DIR}/translations/PeViewer_zh_CN.ts"
 )
 set(QM_FILES)

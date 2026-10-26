@@ -24,11 +24,14 @@ bool LanguageManager::setLanguage(const QString& language) {
         return false;
     if (language == m_language) return true;
 
-    auto translator = std::make_unique<QTranslator>();
-    if (!translator->load(
-            QStringLiteral(":/i18n/PeViewer_%1.qm").arg(language)))
-        return false;
-    if (!QCoreApplication::installTranslator(translator.get())) return false;
+    std::unique_ptr<QTranslator> translator;
+    if (language != QStringLiteral("en")) {
+        translator = std::make_unique<QTranslator>();
+        if (!translator->load(
+                QStringLiteral(":/i18n/PeViewer_%1.qm").arg(language)))
+            return false;
+        if (!QCoreApplication::installTranslator(translator.get())) return false;
+    }
 
     if (m_translator) QCoreApplication::removeTranslator(m_translator.get());
     m_translator = std::move(translator);
