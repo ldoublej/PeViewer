@@ -3,6 +3,10 @@ target_link_libraries(PeDataSourceTests PRIVATE PeDataSource)
 
 add_test(NAME PeDataSourceTests COMMAND PeDataSourceTests)
 
+add_executable(PeParseTests PeParseTests.cpp)
+target_link_libraries(PeParseTests PRIVATE PeParse)
+add_test(NAME PeParseTests COMMAND PeParseTests)
+
 add_executable(PeViewerUiTests
     PeViewerUiTests.cpp
     ../PeViewer/PeViewer.cpp
