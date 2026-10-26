@@ -9,7 +9,7 @@ class PeFileDataSource final : public PeDataSource {
    public:
     explicit PeFileDataSource(const QString& path);
 
-    std::optional<quint64> length() const override;
+    quint64 length() const override;
     bool isFileAligned() const override { return true; }
     quint64 imageBase() const override { return 0; }
     QString url() const override { return m_file.fileName(); }

@@ -11,10 +11,9 @@ PeFileDataSource::PeFileDataSource(const QString& path) : m_file(path) {
                                     .arg(path, m_file.errorString()));
 }
 
-std::optional<quint64> PeFileDataSource::length() const {
+quint64 PeFileDataSource::length() const {
     QMutexLocker lock(&m_mutex);
     const qint64 size = m_file.size();
-    if (size < 0) return std::nullopt;
     return static_cast<quint64>(size);
 }
 

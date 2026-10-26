@@ -30,7 +30,7 @@ class PeDataSource {
    public:
     virtual ~PeDataSource() = default;
 
-    virtual std::optional<quint64> length() const = 0;
+    virtual quint64 length() const = 0;
     bool isEmpty() const { return length() == 0; }
     virtual bool isFileAligned() const = 0;
     virtual quint64 imageBase() const = 0;
