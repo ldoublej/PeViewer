@@ -131,7 +131,11 @@ PeExports* PeExports::parse(const PeDataSource& source, const PeFile& file,
             const auto name = readCString(source, file, nameRva, stringBytes);
             exports.m_entries[index].m_names.append(name);
         }
-        return new PeExports(std::move(exports));
+        auto* parsed = new PeExports;
+        parsed->m_header = exports.m_header;
+        parsed->m_name = std::move(exports.m_name);
+        parsed->m_entries = std::move(exports.m_entries);
+        return parsed;
     } catch (const PeParseError& error) {
         throw PeParseError(error.code(), QString::fromUtf8(error.what()),
                            error.offset(), IMAGE_DIRECTORY_ENTRY_EXPORT);

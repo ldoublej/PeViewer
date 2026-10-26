@@ -33,6 +33,8 @@ class PeSection {
     quint32 characteristics() const { return m_header.Characteristics; }
 
    private:
+    Q_DISABLE_COPY_MOVE(PeSection)
+    PeSection() = default;
     IMAGE_SECTION_HEADER m_header{};
 };
 
@@ -42,10 +44,6 @@ class PeSections {
                              quint16 count,
                              const PeOptionalHeader& optionalHeader);
     ~PeSections();
-    PeSections(const PeSections&) = delete;
-    PeSections& operator=(const PeSections&) = delete;
-    PeSections(PeSections&&) = delete;
-    PeSections& operator=(PeSections&&) = delete;
     // Borrowed elements, owned and deleted by PeSections.
     const std::vector<const PeSection*>& items() const { return m_items; }
     const PeSection* findByName(const QString& name) const;
@@ -55,6 +53,7 @@ class PeSections {
     std::optional<quint64> rvaToFileOffset(quint32 rva) const;
 
    private:
+    Q_DISABLE_COPY_MOVE(PeSections)
     PeSections() = default;
     std::vector<const PeSection*> m_items;
 };

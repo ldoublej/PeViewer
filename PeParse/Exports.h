@@ -59,6 +59,8 @@ class PeExports {
 
    private:
     friend class PeFile;
+    Q_DISABLE_COPY_MOVE(PeExports)
+    PeExports() = default;
     static PeExports* parse(const PeDataSource& source, const PeFile& file,
                             quint64& stringBytes);
     IMAGE_EXPORT_DIRECTORY m_header{};

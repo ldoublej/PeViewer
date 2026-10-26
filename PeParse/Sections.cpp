@@ -67,7 +67,9 @@ PeSection* PeSection::parse(const PeDataSource& source, quint64 offset) {
     PE_READ(IMAGE_SECTION_HEADER, h, NumberOfLinenumbers, offset);
     PE_READ(IMAGE_SECTION_HEADER, h, Characteristics, offset);
 
-    return new PeSection(std::move(section));
+    auto* parsed = new PeSection;
+    parsed->m_header = section.m_header;
+    return parsed;
 }
 
 PeSections::~PeSections() {

@@ -16,12 +16,20 @@
 #endif
 
 namespace {
-static_assert(!std::is_copy_constructible<PeFile>::value);
-static_assert(!std::is_move_constructible<PeFile>::value);
-static_assert(!std::is_copy_constructible<PeNtHeaders>::value);
-static_assert(!std::is_move_constructible<PeNtHeaders>::value);
-static_assert(!std::is_copy_constructible<PeSections>::value);
-static_assert(!std::is_move_constructible<PeSections>::value);
+template <typename T>
+constexpr bool copyMoveDisabled =
+    !std::is_copy_constructible<T>::value &&
+    !std::is_copy_assignable<T>::value &&
+    !std::is_move_constructible<T>::value && !std::is_move_assignable<T>::value;
+
+static_assert(copyMoveDisabled<PeFile>);
+static_assert(copyMoveDisabled<PeDosHeader>);
+static_assert(copyMoveDisabled<PeFileHeader>);
+static_assert(copyMoveDisabled<PeOptionalHeader>);
+static_assert(copyMoveDisabled<PeNtHeaders>);
+static_assert(copyMoveDisabled<PeSection>);
+static_assert(copyMoveDisabled<PeSections>);
+static_assert(copyMoveDisabled<PeExports>);
 
 void require(bool condition, const char* message = "PeParse assertion failed") {
     if (!condition) throw std::runtime_error(message);

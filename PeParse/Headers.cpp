@@ -186,7 +186,9 @@ PeDosHeader* PeDosHeader::parse(const PeDataSource& source) {
         fail(Code::InvalidHeader, QStringLiteral("Invalid e_lfanew"),
              offsetof(IMAGE_DOS_HEADER, e_lfanew));
 
-    return new PeDosHeader(std::move(result));
+    auto* parsed = new PeDosHeader;
+    parsed->m_header = result.m_header;
+    return parsed;
 }
 
 PeFileHeader* PeFileHeader::parse(const PeDataSource& source, quint64 offset) {
@@ -200,7 +202,9 @@ PeFileHeader* PeFileHeader::parse(const PeDataSource& source, quint64 offset) {
     PE_READ(IMAGE_FILE_HEADER, coff, NumberOfSymbols, offset);
     PE_READ(IMAGE_FILE_HEADER, coff, SizeOfOptionalHeader, offset);
     PE_READ(IMAGE_FILE_HEADER, coff, Characteristics, offset);
-    return new PeFileHeader(std::move(result));
+    auto* parsed = new PeFileHeader;
+    parsed->m_header = result.m_header;
+    return parsed;
 }
 
 PeOptionalHeader* PeOptionalHeader::parse(const PeDataSource& source,
@@ -242,7 +246,10 @@ PeOptionalHeader* PeOptionalHeader::parse(const PeDataSource& source,
         optional.sizeOfHeaders() > optional.sizeOfImage())
         fail(Code::InvalidHeader,
              QStringLiteral("Invalid SizeOfImage or SizeOfHeaders"), offset);
-    return new PeOptionalHeader(std::move(result));
+    auto* parsed = new PeOptionalHeader;
+    parsed->m_header = result.m_header;
+    parsed->m_directories = std::move(result.m_directories);
+    return parsed;
 }
 
 PeNtHeaders::~PeNtHeaders() {

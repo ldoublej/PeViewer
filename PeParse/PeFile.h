@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QtGlobal>
+
 #include "Exports.h"
 #include "Headers.h"
 #include "Imports.h"
@@ -15,10 +17,6 @@ class PeFile {
     // The caller deletes PeFile; PeFile owns all parsed components.
     static PeFile* parse(const PeDataSource& source);
     ~PeFile();
-    PeFile(const PeFile&) = delete;
-    PeFile& operator=(const PeFile&) = delete;
-    PeFile(PeFile&&) = delete;
-    PeFile& operator=(PeFile&&) = delete;
 
     // All returned references and pointers are borrowed from this PeFile.
     const PeDosHeader& dosHeader() const { return *m_dos; }
@@ -35,6 +33,7 @@ class PeFile {
     std::optional<quint64> rvaToFileOffset(quint32 rva) const;
 
    private:
+    Q_DISABLE_COPY_MOVE(PeFile)
     PeFile() = default;
     struct MappedRange {
         quint64 offset;
