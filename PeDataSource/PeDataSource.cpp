@@ -17,8 +17,9 @@ quint32 PeDataSource::readU32(quint64 offset) const { return readStruct<quint32>
 quint64 PeDataSource::readU64(quint64 offset) const { return readStruct<quint64>(offset); }
 
 QByteArray PeDataSource::readBytes(quint64 offset, std::size_t count) const {
-    if (count > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+    if (count > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         throw std::length_error("Requested byte array exceeds QByteArray capacity");
+    }
 
     QByteArray bytes(static_cast<int>(count), Qt::Uninitialized);
     readExact(offset, bytes.data(), count);
@@ -33,8 +34,9 @@ QString PeDataSource::readAscii(quint64 offset, std::size_t maxLength) const {
 }
 
 QString PeDataSource::readUtf16(quint64 offset, std::size_t maxCodeUnits) const {
-    if (maxCodeUnits > static_cast<std::size_t>(std::numeric_limits<int>::max()) / 2)
+    if (maxCodeUnits > static_cast<std::size_t>(std::numeric_limits<int>::max()) / 2) {
         throw std::length_error("Requested UTF-16 string exceeds QByteArray capacity");
+    }
 
     const QByteArray bytes = readBytes(offset, maxCodeUnits * 2);
     QString text;
@@ -42,7 +44,9 @@ QString PeDataSource::readUtf16(quint64 offset, std::size_t maxCodeUnits) const 
     for (int i = 0; i < bytes.size(); i += 2) {
         quint16 unit;
         std::memcpy(&unit, bytes.constData() + i, sizeof(unit));
-        if (unit == 0) break;
+        if (unit == 0) {
+            break;
+        }
         if (QChar::isHighSurrogate(unit)) {
             if (i + 3 < bytes.size()) {
                 quint16 next;

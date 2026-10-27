@@ -46,7 +46,9 @@ static_assert(std::is_member_function_pointer<
                   &Exports::parse))>::value);
 
 void require(bool condition, const char* message = "PeParse assertion failed") {
-    if (!condition) throw std::runtime_error(message);
+    if (!condition) {
+        throw std::runtime_error(message);
+    }
 }
 
 class ArraySource final : public PeDataSource {
@@ -62,14 +64,18 @@ public:
     quint64 imageBase() const override { return 0; }
     QString url() const override { return QStringLiteral("test://pe"); }
     void readExact(quint64 offset, char* buffer, std::size_t count) const override {
-        if (count == 0) return;
-        if (!buffer || offset > length() || count > length() - offset)
+        if (count == 0) {
+            return;
+        }
+        if (!buffer || offset > length() || count > length() - offset) {
             throw PeDataSourceError(PeDataSourceError::Code::OutOfBounds,
                                     QStringLiteral("test source bounds"), offset, count);
-        if (m_failReads || (m_failAt && offset <= *m_failAt && count > *m_failAt - offset))
+        }
+        if (m_failReads || (m_failAt && offset <= *m_failAt && count > *m_failAt - offset)) {
             throw PeDataSourceError(PeDataSourceError::Code::Io,
                                     QStringLiteral("injected read failure"),
                                     m_failAt.value_or(offset), count);
+        }
         std::memcpy(buffer, m_bytes.constData() + static_cast<int>(offset), count);
     }
 
@@ -118,9 +124,9 @@ struct Fixture {
         put(Optional + 12, 0x100);
         put(Optional + 16, 0x10f0);
         put(Optional + 20, 0x1000);
-        if (is64)
+        if (is64) {
             put(Optional + 24, Q_UINT64_C(0x140000000), 8);
-        else {
+        } else {
             put(Optional + 24, 0x2000);
             put(Optional + 28, 0x400000);
         }
@@ -307,12 +313,13 @@ void optionalHeaderBounds() {
 }
 
 void importTables() {
-    for (bool is64 : {false, true})
+    for (bool is64 : {false, true}) {
         for (bool fallback : {false, true}) {
             Fixture f(is64);
             f.imports(fallback);
-            if (!fallback)
+            if (!fallback) {
                 f.putRva(0x1240, is64 ? Q_UINT64_C(0x7fff12345678) : 0x76543210, is64 ? 8 : 4);
+            }
             const auto& pe = f.parse();
             require(pe.imports().size() == 1);
             const auto& module = pe.imports()[0];
@@ -332,6 +339,7 @@ void importTables() {
             require(byOrdinal.kind() == ImportEntry::Kind::Ordinal && byOrdinal.ordinal() == 0x42);
             require(byOrdinal.iatRva() == quint32(is64 ? 0x1248 : 0x1244));
         }
+    }
 }
 
 void shortStringsAtEof() {
@@ -589,7 +597,9 @@ void countLimits() {
     imports.put(imports.sectionOffset() + 16, 0x6fe00);
     imports.put(Fixture::Optional + 56, 0x71000);
     imports.imports(true);
-    for (int i = 0; i <= 100000; ++i) imports.put(imports.foa(0x1240) + i * 4, 0x80000001);
+    for (int i = 0; i <= 100000; ++i) {
+        imports.put(imports.foa(0x1240) + i * 4, 0x80000001);
+    }
     expectFailure([&] { return PeFile{ArraySource(imports.bytes)}.parse(); });
 }
 
@@ -644,11 +654,12 @@ void readFailuresThrow() {
                                f.foa(0x1640),
                                f.foa(0x1660),
                                f.foa(0x14c0)};
-        for (int offset : offsets)
+        for (int offset : offsets) {
             expectFailure<PeDataSourceError>([&] {
                 return PeFile{ArraySource(f.bytes, true, false, static_cast<quint64>(offset))}
                     .parse();
             });
+        }
     }
 }
 
@@ -819,7 +830,9 @@ void ownershipCleanup() {
     _CrtMemState before{}, after{}, difference{};
     _CrtMemCheckpoint(&before);
 #endif
-    for (int i = 0; i < 20; ++i) cycle();
+    for (int i = 0; i < 20; ++i) {
+        cycle();
+    }
 #if defined(_MSC_VER) && defined(_DEBUG)
     _CrtMemCheckpoint(&after);
     _CrtMemDifference(&difference, &before, &after);

@@ -8,7 +8,9 @@
 
 namespace {
 void require(bool condition) {
-    if (!condition) throw std::runtime_error("PeDataSource test failed");
+    if (!condition) {
+        throw std::runtime_error("PeDataSource test failed");
+    }
 }
 
 template <typename F>
@@ -71,8 +73,12 @@ int main() {
     require(unicodeSource.readUtf16(0, 4) == QString::fromUtf8("\xf0\x9f\x98\x80\xef\xbf\xbd"));
 
     std::thread first([&] {
-        for (int i = 0; i < 100; ++i) require(source.readU16(0) == 0x5a4d);
+        for (int i = 0; i < 100; ++i) {
+            require(source.readU16(0) == 0x5a4d);
+        }
     });
-    for (int i = 0; i < 100; ++i) require(source.readU32(2) == 0x78563412);
+    for (int i = 0; i < 100; ++i) {
+        require(source.readU32(2) == 0x78563412);
+    }
     first.join();
 }

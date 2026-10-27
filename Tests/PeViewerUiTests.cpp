@@ -13,7 +13,9 @@
 
 namespace {
 void require(bool condition, const char* message) {
-    if (!condition) throw std::runtime_error(message);
+    if (!condition) {
+        throw std::runtime_error(message);
+    }
 }
 
 void testLanguageSwitching() {
@@ -85,7 +87,9 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setOrganizationName(QStringLiteral("PeViewerTests"));
     QCoreApplication::setApplicationName(QStringLiteral("UiTranslations"));
     QTemporaryDir settingsDirectory;
-    if (!settingsDirectory.isValid()) return 1;
+    if (!settingsDirectory.isValid()) {
+        return 1;
+    }
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory.path());
 

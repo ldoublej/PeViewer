@@ -17,7 +17,9 @@ using namespace PeParseDetail;
 namespace {
 using Code = ParseError::Code;
 quint64 readThunk(const PeDataSource& source, const PeFile& file, quint32 rva, bool is64) {
-    if (is64) return readAtRva<quint64>(source, file, rva);
+    if (is64) {
+        return readAtRva<quint64>(source, file, rva);
+    }
     const auto value = readAtRva<quint32>(source, file, rva);
     return value;
 }
@@ -40,11 +42,12 @@ void Imports::parse(const PeDataSource& source, const PeFile& file, quint64& str
     quint64 descriptorOffset = 0;
     quint32 totalEntries = 0;
     for (;;) {
-        if (dir->Size - descriptorOffset < sizeof(IMAGE_IMPORT_DESCRIPTOR))
+        if (dir->Size - descriptorOffset < sizeof(IMAGE_IMPORT_DESCRIPTOR)) {
             fail(Code::InvalidDirectory,
                  QStringLiteral("Import directory has no null descriptor "
                                 "within its size"),
                  file.rvaToFileOffset(dir->VirtualAddress));
+        }
         const auto descriptor = addRva(dir->VirtualAddress, descriptorOffset);
         ImportModule module;
         PE_READ_VALUE(module.m_originalFirstThunk, (readAtRva<quint32>(source, file, descriptor)));
@@ -57,13 +60,16 @@ void Imports::parse(const PeDataSource& source, const PeFile& file, quint64& str
                       (readAtRva<quint32>(source, file, addRva(descriptor, 16))));
         descriptorOffset += sizeof(IMAGE_IMPORT_DESCRIPTOR);
         if (!(module.m_originalFirstThunk | module.m_timeDateStamp | module.m_forwarderChain |
-              module.m_nameRva | module.m_firstThunk))
+              module.m_nameRva | module.m_firstThunk)) {
             break;
-        if (result.size() >= MaxEntries)
+        }
+        if (result.size() >= MaxEntries) {
             fail(Code::LimitExceeded, QStringLiteral("Import module count exceeds parser limit"));
-        if (module.nameRva() == 0 || module.firstThunk() == 0)
+        }
+        if (module.nameRva() == 0 || module.firstThunk() == 0) {
             fail(Code::InvalidDirectory, QStringLiteral("Import descriptor has no DLL name or IAT"),
                  file.rvaToFileOffset(descriptor));
+        }
         PE_READ_VALUE(module.m_name, (readCString(source, file, module.nameRva(), stringBytes)));
         const quint32 lookupRva =
             module.originalFirstThunk() ? module.originalFirstThunk() : module.firstThunk();
@@ -73,15 +79,17 @@ void Imports::parse(const PeDataSource& source, const PeFile& file, quint64& str
             const auto iatRva = addRva(module.firstThunk(), delta);
             const auto iatValue = readThunk(source, file, iatRva, is64);
             if (value == 0) {
-                if (iatValue != 0)
+                if (iatValue != 0) {
                     fail(Code::InvalidDirectory,
                          QStringLiteral("Import INT and IAT terminators disagree"),
                          file.rvaToFileOffset(iatRva));
+                }
                 break;
             }
-            if (totalEntries >= MaxEntries)
+            if (totalEntries >= MaxEntries) {
                 fail(Code::LimitExceeded,
                      QStringLiteral("Import entry count exceeds parser limit"));
+            }
             ++totalEntries;
             ImportEntry entry;
             entry.m_iatRva = iatRva;
@@ -90,14 +98,16 @@ void Imports::parse(const PeDataSource& source, const PeFile& file, quint64& str
             const quint64 ordinalFlag =
                 is64 ? Q_UINT64_C(0x8000000000000000) : Q_UINT64_C(0x80000000);
             if (value & ordinalFlag) {
-                if (value & ~(ordinalFlag | Q_UINT64_C(0xffff)))
+                if (value & ~(ordinalFlag | Q_UINT64_C(0xffff))) {
                     fail(Code::InvalidDirectory,
                          QStringLiteral("Ordinal import has reserved bits set"));
+                }
                 entry.m_kind = ImportEntry::Kind::Ordinal;
                 entry.m_ordinal = static_cast<quint16>(value & 0xffff);
             } else {
-                if (value > Q_UINT64_C(0xffffffff))
+                if (value > Q_UINT64_C(0xffffffff)) {
                     fail(Code::InvalidDirectory, QStringLiteral("Import name RVA exceeds 32 bits"));
+                }
                 const quint32 nameRva = static_cast<quint32>(value);
                 PE_READ_VALUE(entry.m_hint, (readAtRva<quint16>(source, file, nameRva)));
                 PE_READ_VALUE(entry.m_name,

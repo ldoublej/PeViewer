@@ -16,9 +16,10 @@ PeFile::~PeFile() {
 
 void PeFile::parse() {
     const auto& source = m_source;
-    if (!source.isFileAligned())
+    if (!source.isFileAligned()) {
         throw ParseError(ParseError::Code::UnsupportedLayout,
                          QStringLiteral("PeFile::parse requires file-layout PE data"));
+    }
     PeFile file(source);
     file.m_dos = new DosHeader;
     file.m_dos->parse(source);
@@ -47,6 +48,8 @@ void PeFile::parse() {
 
 std::optional<quint64> PeFile::rvaToFileOffset(quint32 rva) const {
     // Header and section file ranges are validated during parsing.
-    if (rva < m_nt->optionalHeader().sizeOfHeaders()) return rva;
+    if (rva < m_nt->optionalHeader().sizeOfHeaders()) {
+        return rva;
+    }
     return m_sections->rvaToFileOffset(rva);
 }

@@ -6,14 +6,21 @@
 #include "detail/ParseUtils.h"
 
 const ExportEntry* Exports::findByName(const QString& name) const {
-    for (const auto& entry : m_entries)
-        if (entry.kind() != ExportEntry::Kind::Empty && entry.names().contains(name)) return &entry;
+    for (const auto& entry : m_entries) {
+        if (entry.kind() != ExportEntry::Kind::Empty && entry.names().contains(name)) {
+            return &entry;
+        }
+    }
     return nullptr;
 }
 const ExportEntry* Exports::findByOrdinal(quint32 ordinal) const {
-    if (ordinal < ordinalBase()) return nullptr;
+    if (ordinal < ordinalBase()) {
+        return nullptr;
+    }
     const quint64 index = quint64(ordinal) - ordinalBase();
-    if (index >= m_entries.size()) return nullptr;
+    if (index >= m_entries.size()) {
+        return nullptr;
+    }
     const auto& entry = m_entries[static_cast<std::size_t>(index)];
     return entry.kind() == ExportEntry::Kind::Empty ? nullptr : &entry;
 }
@@ -41,9 +48,10 @@ void Exports::parse(const PeDataSource& source, const PeFile& file, quint64& str
         m_present = false;
         return;
     }
-    if (dir->Size < sizeof(IMAGE_EXPORT_DIRECTORY))
+    if (dir->Size < sizeof(IMAGE_EXPORT_DIRECTORY)) {
         fail(Code::InvalidDirectory, QStringLiteral("Export directory is smaller than its header"),
              file.rvaToFileOffset(dir->VirtualAddress));
+    }
     IMAGE_EXPORT_DIRECTORY h{};
     QString dllName;
     std::vector<ExportEntry> entries;
@@ -64,24 +72,30 @@ void Exports::parse(const PeDataSource& source, const PeFile& file, quint64& str
     PE_EXPORT_READ(AddressOfNames);
     PE_EXPORT_READ(AddressOfNameOrdinals);
 #undef PE_EXPORT_READ
-    if (h.NumberOfFunctions > MaxEntries || h.NumberOfNames > MaxEntries)
+    if (h.NumberOfFunctions > MaxEntries || h.NumberOfNames > MaxEntries) {
         fail(Code::LimitExceeded, QStringLiteral("Export count exceeds parser limit"),
              file.rvaToFileOffset(base));
-    if (h.NumberOfFunctions && quint64(h.Base) + h.NumberOfFunctions - 1 > Q_UINT64_C(0xffffffff))
+    }
+    if (h.NumberOfFunctions && quint64(h.Base) + h.NumberOfFunctions - 1 > Q_UINT64_C(0xffffffff)) {
         fail(Code::InvalidDirectory, QStringLiteral("Export ordinal range overflows"),
              file.rvaToFileOffset(base));
-    if (h.NumberOfFunctions && h.AddressOfFunctions == 0)
+    }
+    if (h.NumberOfFunctions && h.AddressOfFunctions == 0) {
         fail(Code::InvalidDirectory, QStringLiteral("Missing export address table"),
              file.rvaToFileOffset(base));
-    if (h.NumberOfNames && (h.AddressOfNames == 0 || h.AddressOfNameOrdinals == 0))
+    }
+    if (h.NumberOfNames && (h.AddressOfNames == 0 || h.AddressOfNameOrdinals == 0)) {
         fail(Code::InvalidDirectory, QStringLiteral("Missing export name or ordinal table"),
              file.rvaToFileOffset(base));
+    }
     // Tables are located by their own RVAs and may be outside the directory
     // range.
     checkRvaRange(file, h.AddressOfFunctions, quint64(h.NumberOfFunctions) * 4);
     checkRvaRange(file, h.AddressOfNames, quint64(h.NumberOfNames) * 4);
     checkRvaRange(file, h.AddressOfNameOrdinals, quint64(h.NumberOfNames) * 2);
-    if (h.Name) PE_READ_VALUE(dllName, (readCString(source, file, h.Name, stringBytes)));
+    if (h.Name) {
+        PE_READ_VALUE(dllName, (readCString(source, file, h.Name, stringBytes)));
+    }
     entries.reserve(h.NumberOfFunctions);
     const quint64 directoryEnd = quint64(base) + dir->Size;
     for (quint32 i = 0; i < h.NumberOfFunctions; ++i) {
@@ -97,10 +111,11 @@ void Exports::parse(const PeDataSource& source, const PeFile& file, quint64& str
                               (readCString(source, file, entry.m_rva, stringBytes,
                                            directoryEnd - entry.m_rva)));
             } else {
-                if (entry.m_rva >= file.ntHeaders().optionalHeader().sizeOfImage())
+                if (entry.m_rva >= file.ntHeaders().optionalHeader().sizeOfImage()) {
                     fail(Code::InvalidDirectory,
                          QStringLiteral("Export function RVA is outside SizeOfImage"),
                          file.rvaToFileOffset(h.AddressOfFunctions));
+                }
                 entry.m_kind = ExportEntry::Kind::Function;
             }
         }
@@ -111,9 +126,10 @@ void Exports::parse(const PeDataSource& source, const PeFile& file, quint64& str
             readAtRva<quint32>(source, file, addRva(h.AddressOfNames, quint64(i) * 4));
         const auto index =
             readAtRva<quint16>(source, file, addRva(h.AddressOfNameOrdinals, quint64(i) * 2));
-        if (index >= entries.size() || nameRva == 0)
+        if (index >= entries.size() || nameRva == 0) {
             fail(Code::InvalidDirectory, QStringLiteral("Invalid export name or ordinal index"),
                  file.rvaToFileOffset(h.AddressOfNameOrdinals));
+        }
         const auto name = readCString(source, file, nameRva, stringBytes);
         entries[index].m_names.append(name);
     }

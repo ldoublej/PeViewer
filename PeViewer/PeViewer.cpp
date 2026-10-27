@@ -35,7 +35,9 @@ PeViewer::~PeViewer() {}
 void PeViewer::on_actionOpen_triggered(bool b) {
     QString fileName = QFileDialog::getOpenFileName(this);
     QFileInfo fileInfo(fileName);
-    if (!fileInfo.exists()) return;
+    if (!fileInfo.exists()) {
+        return;
+    }
 
     PeFileDataSource* dataSource = new PeFileDataSource(fileName);
     PeFile* peFile = new PeFile(*dataSource);
@@ -44,7 +46,9 @@ void PeViewer::on_actionOpen_triggered(bool b) {
 
 void PeViewer::changeEvent(QEvent* event) {
     QMainWindow::changeEvent(event);
-    if (event->type() == QEvent::LanguageChange) retranslateUi();
+    if (event->type() == QEvent::LanguageChange) {
+        retranslateUi();
+    }
 }
 
 void PeViewer::retranslateUi() {
