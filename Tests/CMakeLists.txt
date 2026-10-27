@@ -18,7 +18,7 @@ add_executable(PeViewerUiTests
 )
 set_target_properties(PeViewerUiTests PROPERTIES AUTORCC ON)
 target_include_directories(PeViewerUiTests PRIVATE "${PROJECT_SOURCE_DIR}/PeViewer")
-target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets)
+target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets PeParse)
 add_dependencies(PeViewerUiTests PeViewer_translations)
 add_test(NAME PeViewerUiTests COMMAND PeViewerUiTests)
 set_tests_properties(PeViewerUiTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
