@@ -2,8 +2,11 @@
 
 #include <QActionGroup>
 #include <QEvent>
+#include <QFileDialog>
 
 #include "LanguageManager.h"
+#include "PeFile.h"
+#include "PeFileDataSource.h"
 
 PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     : QMainWindow(parent), m_languageManager(languageManager) {
@@ -27,7 +30,20 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     updateLanguageActions();
 }
 
-PeViewer::~PeViewer() = default;
+PeViewer::~PeViewer() {
+
+}
+
+void PeViewer::on_actionOpen_triggered(bool b) {
+    QString fileName = QFileDialog::getOpenFileName(this);
+    QFileInfo fileInfo(fileName);
+    if (!fileInfo.exists())
+        return;
+    
+    PeFileDataSource* dataSource = new PeFileDataSource(fileName);
+    PeFile * peFile = new PeFile(*dataSource);
+    peFile->parse();
+}
 
 void PeViewer::changeEvent(QEvent* event) {
     QMainWindow::changeEvent(event);

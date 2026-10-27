@@ -30,6 +30,15 @@
     <addaction name="actionEnglish"/>
     <addaction name="actionSimplifiedChinese"/>
    </widget>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="actionOpen"/>
+    <addaction name="separator"/>
+    <addaction name="actionClose"/>
+   </widget>
+   <addaction name="menuFile"/>
    <addaction name="menuLanguage"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
@@ -55,6 +64,16 @@
    </property>
    <property name="text">
     <string notr="true">简体中文</string>
+   </property>
+  </action>
+  <action name="actionOpen">
+   <property name="text">
+    <string>Open</string>
+   </property>
+  </action>
+  <action name="actionClose">
+   <property name="text">
+    <string>Close</string>
    </property>
   </action>
  </widget>

@@ -9,7 +9,7 @@ class LanguageManager;
 class PeViewer : public QMainWindow {
     Q_OBJECT
 
-   public:
+public:
     explicit PeViewer(LanguageManager& languageManager,
                       QWidget* parent = nullptr);
     ~PeViewer() override;
@@ -17,10 +17,13 @@ class PeViewer : public QMainWindow {
    protected:
     void changeEvent(QEvent* event) override;
 
-   private:
+private Q_SLOTS:
+    void on_actionOpen_triggered(bool b);
+private:
     void updateLanguageActions();
     void retranslateUi();
 
+    
     LanguageManager& m_languageManager;
     Ui::PeViewerClass ui;
 };
