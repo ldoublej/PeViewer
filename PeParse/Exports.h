@@ -5,6 +5,7 @@
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
+#include <cstdint>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -16,7 +17,7 @@ class PeFile;
 
 class ExportEntry {
 public:
-    enum class Kind { Empty, Function, Forwarder };
+    enum class Kind : std::int8_t { Empty, Function, Forwarder };
     Kind kind() const { return m_kind; }
     quint32 ordinal() const { return m_ordinal; }
     const QStringList& names() const { return m_names; }

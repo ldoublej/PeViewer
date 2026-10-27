@@ -4,13 +4,14 @@
 #include <QString>
 #include <QtGlobal>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <type_traits>
 
 class PeDataSourceError : public std::runtime_error {
 public:
-    enum class Code { OutOfBounds, Io };
+    enum class Code : std::int8_t { OutOfBounds, Io };
 
     PeDataSourceError(Code code, const QString& message, quint64 offset = 0,
                       std::size_t length = 0);

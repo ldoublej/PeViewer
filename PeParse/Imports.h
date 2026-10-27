@@ -2,6 +2,7 @@
 
 #include <QString>
 #include <QtGlobal>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -12,7 +13,7 @@ class PeFile;
 
 class ImportEntry {
 public:
-    enum class Kind { Name, Ordinal };
+    enum class Kind : std::int8_t { Name, Ordinal };
     Kind kind() const { return m_kind; }
     const QString& name() const { return m_name; }
     quint16 hint() const { return m_hint; }

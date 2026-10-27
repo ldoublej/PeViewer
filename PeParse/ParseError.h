@@ -2,12 +2,13 @@
 
 #include <QString>
 #include <QtGlobal>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 
 class ParseError : public std::runtime_error {
 public:
-    enum class Code {
+    enum class Code : std::int8_t {
         TruncatedData,
         InvalidSignature,
         UnsupportedFormat,
