@@ -7,6 +7,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # 警告视为错误
 if(MSVC)
     add_compile_options(/utf-8 /WX /EHsc)

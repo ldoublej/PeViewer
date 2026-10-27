@@ -1,0 +1,17 @@
+---
+InheritParentConfig: false
+Checks: >-
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-equals-default,
+  readability-duplicate-include
+WarningsAsErrors: ''
+HeaderFilterRegex: '(^|[/\\])(PeDataSource|PeParse|WorkspaceManager|PeViewer|Tests)[/\\]'
+ExcludeHeaderFilterRegex: '(^|[/\\])(out|build|PeStructs)[/\\]|[/\\][^/\\]*_autogen[/\\]'
+SystemHeaders: false
+FormatStyle: file
