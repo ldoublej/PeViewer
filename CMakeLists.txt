@@ -24,7 +24,7 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
 add_subdirectory("PeStructs")
 add_subdirectory("PeDataSource")
 add_subdirectory("PeParse")
-add_subdirectory("PeWorkspaceManager")
+add_subdirectory("WorkspaceManager")
 add_subdirectory("PeViewer")
 
 if(BUILD_TESTING)

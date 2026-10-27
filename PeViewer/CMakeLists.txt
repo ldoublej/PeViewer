@@ -51,7 +51,7 @@ add_dependencies(${PROJECT_NAME} PeViewer_translations)
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         PeParse
-        PeWorkspaceManager
+        WorkspaceManager
         PeDataSource
     PUBLIC
         Qt::Core

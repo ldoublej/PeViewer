@@ -1,8 +1,8 @@
-project(PeWorkspaceManager LANGUAGES CXX)
+project(WorkspaceManager LANGUAGES CXX)
 
 add_library(${PROJECT_NAME} STATIC
-    PeWorkspaceManager.cpp
-    PeWorkspaceManager.h
+    WorkspaceManager.cpp
+    WorkspaceManager.h
 )
 
 target_link_libraries(${PROJECT_NAME}
