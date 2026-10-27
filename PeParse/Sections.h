@@ -10,13 +10,14 @@
 #include "ParseError.h"
 
 class PeDataSource;
-class PeOptionalHeader;
+class OptionalHeader;
 
-// parse() returns a caller-owned pointer and throws PeParseError on failure.
+// parse() updates this object on success and propagates exceptions on failure.
 
-class PeSection {
+class Section {
    public:
-    static PeSection* parse(const PeDataSource& source, quint64 offset);
+    Section() = default;
+    void parse(const PeDataSource& source, quint64 offset);
     QString name() const;
     quint32 virtualAddress() const { return m_header.VirtualAddress; }
     quint32 virtualSize() const { return m_header.Misc.VirtualSize; }
@@ -33,27 +34,25 @@ class PeSection {
     quint32 characteristics() const { return m_header.Characteristics; }
 
    private:
-    Q_DISABLE_COPY_MOVE(PeSection)
-    PeSection() = default;
+    Q_DISABLE_COPY_MOVE(Section)
     IMAGE_SECTION_HEADER m_header{};
 };
 
-class PeSections {
+class Sections {
    public:
-    static PeSections* parse(const PeDataSource& source, quint64 offset,
-                             quint16 count,
-                             const PeOptionalHeader& optionalHeader);
-    ~PeSections();
-    // Borrowed elements, owned and deleted by PeSections.
-    const std::vector<const PeSection*>& items() const { return m_items; }
-    const PeSection* findByName(const QString& name) const;
+    Sections() = default;
+    void parse(const PeDataSource& source, quint64 offset, quint16 count,
+               const OptionalHeader& optionalHeader);
+    ~Sections();
+    // Borrowed elements, owned and deleted by Sections.
+    const std::vector<const Section*>& items() const { return m_items; }
+    const Section* findByName(const QString& name) const;
     // Includes the virtual zero-filled tail. A match need not have file bytes.
-    const PeSection* findByRva(quint32 rva) const;
+    const Section* findByRva(quint32 rva) const;
     // Maps section raw data only; PeFile additionally handles PE headers.
     std::optional<quint64> rvaToFileOffset(quint32 rva) const;
 
    private:
-    Q_DISABLE_COPY_MOVE(PeSections)
-    PeSections() = default;
-    std::vector<const PeSection*> m_items;
+    Q_DISABLE_COPY_MOVE(Sections)
+    std::vector<const Section*> m_items;
 };

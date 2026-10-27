@@ -2,7 +2,9 @@
 
 #include <PeDataSource.h>
 
-#include <algorithm>
+#include <utility>
+
+PeFile::PeFile(const PeDataSource& source) : m_source(source) {}
 
 PeFile::~PeFile() {
     delete m_exports;
@@ -12,52 +14,42 @@ PeFile::~PeFile() {
     delete m_dos;
 }
 
-PeFile* PeFile::parse(const PeDataSource& source) {
-    PeFile* file = nullptr;
-    try {
-        if (!source.isFileAligned())
-            throw PeParseError(
-                PeParseError::Code::UnsupportedLayout,
-                QStringLiteral("PeFile::parse requires file-layout PE data"));
-        file = new PeFile;
-        file->m_fileSize = source.length();
-        file->m_dos = PeDosHeader::parse(source);
-        file->m_nt = PeNtHeaders::parse(source, file->m_dos->ntHeadersOffset());
-        file->m_sections = PeSections::parse(
-            source, file->m_dos->ntHeadersOffset() + file->m_nt->totalSize(),
-            file->m_nt->fileHeader().numberOfSections(),
-            file->m_nt->optionalHeader());
-        quint64 stringBytes = 0;
-        file->m_imports = PeImportModule::parseAll(source, *file, stringBytes);
-        file->m_exports = PeExports::parse(source, *file, stringBytes);
-        return file;
-    } catch (const PeDataSourceError& error) {
-        delete file;
-        throw PeParseError(PeParseError::Code::DataSource,
-                           QString::fromUtf8(error.what()), error.offset());
-    } catch (...) {
-        delete file;
-        throw;
+void PeFile::parse() {
+    const auto& source = m_source;
+    if (!source.isFileAligned())
+        throw ParseError(
+            ParseError::Code::UnsupportedLayout,
+            QStringLiteral("PeFile::parse requires file-layout PE data"));
+    PeFile file(source);
+    file.m_dos = new DosHeader;
+    file.m_dos->parse(source);
+    file.m_nt = new NtHeaders;
+    file.m_nt->parse(source, file.m_dos->ntHeadersOffset());
+    file.m_sections = new Sections;
+    file.m_sections->parse(
+        source, file.m_dos->ntHeadersOffset() + file.m_nt->totalSize(),
+        file.m_nt->fileHeader().numberOfSections(),
+        file.m_nt->optionalHeader());
+    quint64 stringBytes = 0;
+    file.m_imports = new Imports;
+    file.m_imports->parse(source, file, stringBytes);
+    file.m_exports = new Exports;
+    file.m_exports->parse(source, file, stringBytes);
+    if (!file.m_exports->isPresent()) {
+        delete file.m_exports;
+        file.m_exports = nullptr;
     }
+
+    // Commit only after parsing succeeds; file releases the previous result.
+    std::swap(m_dos, file.m_dos);
+    std::swap(m_nt, file.m_nt);
+    std::swap(m_sections, file.m_sections);
+    std::swap(m_imports, file.m_imports);
+    std::swap(m_exports, file.m_exports);
 }
 
-std::optional<PeFile::MappedRange> PeFile::mappedRange(quint32 rva) const {
-    const quint64 headers = m_nt->optionalHeader().sizeOfHeaders();
-    if (rva < headers && rva < m_fileSize)
-        return MappedRange{rva, (std::min)(headers, m_fileSize) - rva};
-    for (const auto* section : m_sections->items()) {
-        if (rva < section->virtualAddress()) continue;
-        const quint64 delta = quint64(rva) - section->virtualAddress();
-        if (delta >= section->rawSize()) continue;
-        const quint64 offset = quint64(section->rawOffset()) + delta;
-        if (offset >= m_fileSize) return std::nullopt;
-        return MappedRange{offset,
-                           (std::min)(quint64(section->rawSize()) - delta,
-                                      m_fileSize - offset)};
-    }
-    return std::nullopt;
-}
 std::optional<quint64> PeFile::rvaToFileOffset(quint32 rva) const {
-    const auto range = mappedRange(rva);
-    return range ? std::optional<quint64>(range->offset) : std::nullopt;
+    // Header and section file ranges are validated during parsing.
+    if (rva < m_nt->optionalHeader().sizeOfHeaders()) return rva;
+    return m_sections->rvaToFileOffset(rva);
 }

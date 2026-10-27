@@ -14,7 +14,7 @@
 class PeDataSource;
 class PeFile;
 
-class PeExportEntry {
+class ExportEntry {
    public:
     enum class Kind { Empty, Function, Forwarder };
     Kind kind() const { return m_kind; }
@@ -25,7 +25,7 @@ class PeExportEntry {
     const QString& forwarder() const { return m_forwarder; }
 
    private:
-    friend class PeExports;
+    friend class Exports;
     Kind m_kind = Kind::Empty;
     quint32 m_ordinal = 0;
     QStringList m_names;
@@ -33,16 +33,19 @@ class PeExportEntry {
     QString m_forwarder;
 };
 
-class PeExports {
+class Exports {
    public:
-    // Missing exports return nullptr; malformed exports throw PeParseError.
-    static PeExports* parse(const PeDataSource& source, const PeFile& file);
+    Exports() = default;
+    // Missing exports clear this object; malformed input propagates an
+    // exception.
+    void parse(const PeDataSource& source, const PeFile& file);
+    bool isPresent() const { return m_present; }
     const QString& dllName() const { return m_name; }
     quint32 ordinalBase() const { return m_header.Base; }
-    const std::vector<PeExportEntry>& entries() const { return m_entries; }
+    const std::vector<ExportEntry>& entries() const { return m_entries; }
     // Empty EAT slots are retained in entries(), but are not found as exports.
-    const PeExportEntry* findByName(const QString& name) const;
-    const PeExportEntry* findByOrdinal(quint32 ordinal) const;
+    const ExportEntry* findByName(const QString& name) const;
+    const ExportEntry* findByOrdinal(quint32 ordinal) const;
     quint32 characteristics() const { return m_header.Characteristics; }
     quint32 timeDateStamp() const { return m_header.TimeDateStamp; }
     std::pair<quint16, quint16> version() const {
@@ -59,11 +62,11 @@ class PeExports {
 
    private:
     friend class PeFile;
-    Q_DISABLE_COPY_MOVE(PeExports)
-    PeExports() = default;
-    static PeExports* parse(const PeDataSource& source, const PeFile& file,
-                            quint64& stringBytes);
+    Q_DISABLE_COPY_MOVE(Exports)
+    void parse(const PeDataSource& source, const PeFile& file,
+               quint64& stringBytes);
     IMAGE_EXPORT_DIRECTORY m_header{};
     QString m_name;
-    std::vector<PeExportEntry> m_entries;
+    std::vector<ExportEntry> m_entries;
+    bool m_present = false;
 };

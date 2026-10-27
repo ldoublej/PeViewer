@@ -10,7 +10,7 @@
 class PeDataSource;
 class PeFile;
 
-class PeImportEntry {
+class ImportEntry {
    public:
     enum class Kind { Name, Ordinal };
     Kind kind() const { return m_kind; }
@@ -22,7 +22,7 @@ class PeImportEntry {
     quint64 iatValue() const { return m_iatValue; }
 
    private:
-    friend class PeImportModule;
+    friend class Imports;
     Kind m_kind = Kind::Name;
     QString m_name;
     quint16 m_hint = 0;
@@ -32,14 +32,10 @@ class PeImportEntry {
     quint64 m_iatValue = 0;
 };
 
-class PeImportModule {
+class ImportModule {
    public:
-    // Returns an owning collection pointer (empty if no import directory).
-    // The caller deletes it; malformed input throws PeParseError.
-    static std::vector<PeImportModule>* parseAll(const PeDataSource& source,
-                                                 const PeFile& file);
     const QString& dllName() const;
-    const std::vector<PeImportEntry>& entries() const;
+    const std::vector<ImportEntry>& entries() const;
     quint32 originalFirstThunk() const { return m_originalFirstThunk; }
     quint32 firstThunk() const { return m_firstThunk; }
     quint32 timeDateStamp() const { return m_timeDateStamp; }
@@ -47,15 +43,26 @@ class PeImportModule {
     quint32 nameRva() const { return m_nameRva; }
 
    private:
-    friend class PeFile;
-    static std::vector<PeImportModule>* parseAll(const PeDataSource& source,
-                                                 const PeFile& file,
-                                                 quint64& stringBytes);
+    friend class Imports;
     QString m_name;
-    std::vector<PeImportEntry> m_entries;
+    std::vector<ImportEntry> m_entries;
     quint32 m_originalFirstThunk = 0;
     quint32 m_firstThunk = 0;
     quint32 m_timeDateStamp = 0;
     quint32 m_forwarderChain = 0;
     quint32 m_nameRva = 0;
+};
+
+class Imports {
+   public:
+    Imports() = default;
+    void parse(const PeDataSource& source, const PeFile& file);
+    const std::vector<ImportModule>& modules() const { return m_modules; }
+
+   private:
+    friend class PeFile;
+    Q_DISABLE_COPY_MOVE(Imports)
+    void parse(const PeDataSource& source, const PeFile& file,
+               quint64& stringBytes);
+    std::vector<ImportModule> m_modules;
 };

@@ -7,27 +7,28 @@
 
 namespace PeParseDetail {
 namespace {
-using Code = PeParseError::Code;
+using Code = ParseError::Code;
 quint64 mappedBytes(const PeFile& file, quint32 rva) {
     const auto offset = file.rvaToFileOffset(rva);
     if (!offset)
         fail(Code::InvalidRva,
              QStringLiteral("RVA %1 has no file data").arg(rva));
     const quint64 headers = file.ntHeaders().optionalHeader().sizeOfHeaders();
-    if (rva < headers) return (std::min)(headers, file.fileSize()) - rva;
+    // Header and section extents were checked against the file size during
+    // parsing.
+    if (rva < headers) return headers - rva;
     const auto* section = file.sections().findByRva(rva);
     if (!section)
         fail(Code::InvalidRva,
              QStringLiteral("RVA %1 has no section").arg(rva));
-    return (std::min)(quint64(section->rawSize()) -
-                          (quint64(rva) - section->virtualAddress()),
-                      file.fileSize() - *offset);
+    return quint64(section->rawSize()) -
+           (quint64(rva) - section->virtualAddress());
 }
 }  // namespace
 
 void fail(Code code, const QString& message, std::optional<quint64> offset,
           std::optional<int> directoryIndex) {
-    throw PeParseError(code, message, offset, directoryIndex);
+    throw ParseError(code, message, offset, directoryIndex);
 }
 
 void checkRange(const PeDataSource& source, quint64 offset, quint64 size) {
@@ -68,11 +69,7 @@ QByteArray readBytes(const PeDataSource& source, quint64 offset,
         fail(Code::LimitExceeded,
              QStringLiteral("Read exceeds byte-array capacity"), offset);
     checkRange(source, offset, size);
-    try {
-        return source.readBytes(offset, size);
-    } catch (const PeDataSourceError& error) {
-        fail(Code::DataSource, QString::fromUtf8(error.what()), error.offset());
-    }
+    return source.readBytes(offset, size);
 }
 
 QByteArray readBytesAtRva(const PeDataSource& source, const PeFile& file,

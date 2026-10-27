@@ -23,13 +23,36 @@ constexpr bool copyMoveDisabled =
     !std::is_move_constructible<T>::value && !std::is_move_assignable<T>::value;
 
 static_assert(copyMoveDisabled<PeFile>);
-static_assert(copyMoveDisabled<PeDosHeader>);
-static_assert(copyMoveDisabled<PeFileHeader>);
-static_assert(copyMoveDisabled<PeOptionalHeader>);
-static_assert(copyMoveDisabled<PeNtHeaders>);
-static_assert(copyMoveDisabled<PeSection>);
-static_assert(copyMoveDisabled<PeSections>);
-static_assert(copyMoveDisabled<PeExports>);
+static_assert(copyMoveDisabled<DosHeader>);
+static_assert(copyMoveDisabled<FileHeader>);
+static_assert(copyMoveDisabled<OptionalHeader>);
+static_assert(copyMoveDisabled<NtHeaders>);
+static_assert(copyMoveDisabled<Section>);
+static_assert(copyMoveDisabled<Sections>);
+static_assert(copyMoveDisabled<Exports>);
+static_assert(copyMoveDisabled<Imports>);
+
+static_assert(std::is_member_function_pointer<decltype(&PeFile::parse)>::value);
+static_assert(
+    std::is_member_function_pointer<decltype(&DosHeader::parse)>::value);
+static_assert(
+    std::is_member_function_pointer<decltype(&FileHeader::parse)>::value);
+static_assert(
+    std::is_member_function_pointer<decltype(&OptionalHeader::parse)>::value);
+static_assert(
+    std::is_member_function_pointer<decltype(&NtHeaders::parse)>::value);
+static_assert(
+    std::is_member_function_pointer<decltype(&Section::parse)>::value);
+static_assert(
+    std::is_member_function_pointer<decltype(&Sections::parse)>::value);
+static_assert(std::is_member_function_pointer<
+              decltype(static_cast<void (Imports::*)(const PeDataSource&,
+                                                     const PeFile&)>(
+                  &Imports::parse))>::value);
+static_assert(std::is_member_function_pointer<
+              decltype(static_cast<void (Exports::*)(const PeDataSource&,
+                                                     const PeFile&)>(
+                  &Exports::parse))>::value);
 
 void require(bool condition, const char* message = "PeParse assertion failed") {
     if (!condition) throw std::runtime_error(message);
@@ -79,6 +102,7 @@ struct Fixture {
     static constexpr int Optional = Coff + 20;
     QByteArray bytes = QByteArray(0x1200, '\0');
     bool is64;
+    mutable std::optional<ArraySource> parsedSource;
     mutable PeFile* parsed = nullptr;
 
     ~Fixture() { delete parsed; }
@@ -215,28 +239,30 @@ struct Fixture {
     const PeFile& parse() const {
         delete parsed;
         parsed = nullptr;
-        parsed = PeFile::parse(ArraySource(bytes));
+        parsedSource.emplace(bytes);
+        parsed = new PeFile(*parsedSource);
+        parsed->parse();
         return *parsed;
     }
 };
 
-template <typename F>
-PeParseError captureError(F operation) {
+template <typename Error = ParseError, typename F>
+Error captureError(F operation) {
     try {
         if constexpr (std::is_pointer<decltype(operation())>::value) {
             delete operation();
         } else {
             operation();
         }
-    } catch (const PeParseError& error) {
+    } catch (const Error& error) {
         return error;
     }
-    throw std::runtime_error("Expected PeParseError was not thrown");
+    throw std::runtime_error("Expected exception was not thrown");
 }
 
-template <typename F>
+template <typename Error = ParseError, typename F>
 void expectFailure(F operation) {
-    const auto error = captureError(operation);
+    const auto error = captureError<Error>(operation);
     require(std::strlen(error.what()) != 0, "Missing parsing diagnostic");
 }
 
@@ -259,7 +285,7 @@ void headersAndMapping() {
         require(nt.fileHeader().timeDateStamp() == 0x12345678 &&
                 nt.fileHeader().characteristics() == 0x2102);
         require(pe.imageBase() == (is64 ? Q_UINT64_C(0x140000000) : 0x400000));
-        require(pe.entryPointRva() == 0x10f0 && pe.fileSize() == 0x1200);
+        require(pe.entryPointRva() == 0x10f0);
         require(optional.baseOfData() ==
                 (is64 ? std::nullopt : std::optional<quint32>(0x2000)));
         require(optional.sizeOfStackReserve() ==
@@ -300,9 +326,9 @@ void optionalHeaderBounds() {
         require(pe.ntHeaders().optionalHeader().dataDirectories().empty());
         require(pe.sections().findByName(QStringLiteral(".test")) != nullptr);
         f.put(f.directoryCountOffset(), 1);
-        expectFailure([&] { return PeFile::parse(ArraySource(f.bytes)); });
+        expectFailure([&] { return PeFile{ArraySource(f.bytes)}.parse(); });
         f.put(Fixture::Coff + 16, fixed - 1, 2);
-        expectFailure([&] { return PeFile::parse(ArraySource(f.bytes)); });
+        expectFailure([&] { return PeFile{ArraySource(f.bytes)}.parse(); });
     }
     Fixture f;
     f.put(f.directoryCountOffset(), 0xffffffff);
@@ -333,7 +359,7 @@ void importTables() {
             require(module.entries().size() == 2);
             const auto& byName = module.entries()[0];
             const auto& byOrdinal = module.entries()[1];
-            require(byName.kind() == PeImportEntry::Kind::Name &&
+            require(byName.kind() == ImportEntry::Kind::Name &&
                     byName.name() == QStringLiteral("ExitProcess"));
             require(byName.hint() == 7 && byName.iatRva() == 0x1240 &&
                     byName.lookupValue() == 0x1280);
@@ -341,7 +367,7 @@ void importTables() {
                     (fallback
                          ? 0x1280
                          : (is64 ? Q_UINT64_C(0x7fff12345678) : 0x76543210)));
-            require(byOrdinal.kind() == PeImportEntry::Kind::Ordinal &&
+            require(byOrdinal.kind() == ImportEntry::Kind::Ordinal &&
                     byOrdinal.ordinal() == 0x42);
             require(byOrdinal.iatRva() == quint32(is64 ? 0x1248 : 0x1244));
         }
@@ -379,10 +405,10 @@ void exportTables() {
         const auto* alias = exports.findByName(QStringLiteral("Alias"));
         const auto* forward = exports.findByName(QStringLiteral("Alpha"));
         require(normal && normal == alias && normal->ordinal() == 0x10000);
-        require(normal->kind() == PeExportEntry::Kind::Function &&
+        require(normal->kind() == ExportEntry::Kind::Function &&
                 normal->rva() == 0x10f0);
         require(forward && forward->ordinal() == 0x10002 &&
-                forward->kind() == PeExportEntry::Kind::Forwarder);
+                forward->kind() == ExportEntry::Kind::Forwarder);
         require(forward->forwarder() == QStringLiteral("OTHER.Target"));
         require(exports.findByOrdinal(0x10003)->rva() == 0x2100 &&
                 !pe.rvaToFileOffset(0x2100));
@@ -390,7 +416,7 @@ void exportTables() {
                 !exports.findByOrdinal(0x10001) &&
                 !exports.findByOrdinal(0x10004));
         require(!exports.findByName(QStringLiteral("missing")));
-        require(exports.entries()[1].kind() == PeExportEntry::Kind::Empty);
+        require(exports.entries()[1].kind() == ExportEntry::Kind::Empty);
     }
     Fixture empty;
     empty.setDirectory(0, 0x1400, 40);
@@ -414,53 +440,53 @@ void bssAndSectionNames() {
     require(pe.sections().findByName(QStringLiteral("ABCDEFGH")) != nullptr);
     require(pe.sections().findByRva(0x3000) && !pe.rvaToFileOffset(0x3000));
     f.put(second + 12, 0x2000);
-    expectFailure([&] { return PeFile::parse(ArraySource(f.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(f.bytes)}.parse(); });
     f.put(second + 12, 0xfffff000);
     f.put(second + 8, 0x2000);
-    expectFailure([&] { return PeFile::parse(ArraySource(f.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(f.bytes)}.parse(); });
 }
 
 void headersRejectMalformedData() {
-    expectFailure([] { return PeFile::parse(ArraySource(QByteArray())); });
+    expectFailure([] { return PeFile{ArraySource(QByteArray())}.parse(); });
     Fixture f;
-    expectFailure([&] { return PeFile::parse(ArraySource(f.bytes, false)); });
-    expectFailure(
-        [&] { return PeFile::parse(ArraySource(f.bytes, true, true)); });
+    expectFailure([&] { return PeFile{ArraySource(f.bytes, false)}.parse(); });
+    expectFailure<PeDataSourceError>(
+        [&] { return PeFile{ArraySource(f.bytes, true, true)}.parse(); });
     auto bad = f;
     bad.put(0, 0, 2);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     for (quint32 offset : {quint32(0xffffffff), quint32(0x20)}) {
         bad = f;
         bad.put(0x3c, offset);
-        expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+        expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     }
     bad = f;
     bad.put(0x3c, 0x100000);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.put(Fixture::Nt, 0);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.put(Fixture::Optional, 0x107, 2);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.put(Fixture::Coff + 16, 1, 2);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.put(Fixture::Optional + 36, 0);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.put(Fixture::Optional + 60, 0x100);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.bytes.chop(1);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.put(bad.sectionOffset() + 20, 0x100);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.put(bad.sectionOffset() + 12, 0xfffffff0);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
 }
 
 void directoriesRejectMalformedData() {
@@ -468,57 +494,57 @@ void directoriesRejectMalformedData() {
     f.imports();
     auto bad = f;
     bad.setDirectory(1, 0x1100, 20);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.setDirectory(1, 0, 40);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.setDirectory(1, 0xfffffff0, 40);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x110c, 0x2100);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1100, 0x1ffc);
     bad.putRva(0x1ffc, 0x80000042);
     // Missing thunk terminator.
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1200, 0x80010042);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1248, 1);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     Fixture wide(true);
     wide.imports();
     wide.putRva(0x1200, Q_UINT64_C(0x100001280), 8);
-    expectFailure([&] { return PeFile::parse(ArraySource(wide.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(wide.bytes)}.parse(); });
 
     f = Fixture();
     f.exports();
     bad = f;
     bad.setDirectory(0, 0x1400, 39);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1640, 4, 2);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1414, 0xffffffff);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1410, 0xffffffff);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x141c, 0);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1608, 0x14fe);
     bad.bytes[bad.foa(0x14fe)] = 'A';
     bad.bytes[bad.foa(0x14ff)] = 'B';
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
     bad = f;
     bad.putRva(0x1600, 0x3000);
-    expectFailure([&] { return PeFile::parse(ArraySource(bad.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(bad.bytes)}.parse(); });
 }
 
 void stringsAndLimits() {
@@ -535,7 +561,7 @@ void stringsAndLimits() {
     f.imports();
     f.putRva(0x110c, 0x2000);
     std::memset(f.bytes.data() + f.foa(0x2000), 'A', 4096);
-    expectFailure([&] { return PeFile::parse(ArraySource(f.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(f.bytes)}.parse(); });
 }
 
 void crossSectionReads() {
@@ -599,7 +625,7 @@ void countLimits() {
     sections.put(Fixture::Coff + 2, 4097, 2);
     sections.put(Fixture::Optional + 60, 0x30000);
     sections.put(Fixture::Optional + 56, 0x40000);
-    expectFailure([&] { return PeFile::parse(ArraySource(sections.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(sections.bytes)}.parse(); });
 
     Fixture imports;
     imports.bytes.resize(0x70000);
@@ -612,7 +638,7 @@ void countLimits() {
     imports.imports(true);
     for (int i = 0; i <= 100000; ++i)
         imports.put(imports.foa(0x1240) + i * 4, 0x80000001);
-    expectFailure([&] { return PeFile::parse(ArraySource(imports.bytes)); });
+    expectFailure([&] { return PeFile{ArraySource(imports.bytes)}.parse(); });
 }
 
 void fileSourceIntegration() {
@@ -626,13 +652,15 @@ void fileSourceIntegration() {
     require(output.open(QIODevice::WriteOnly));
     require(output.write(f.bytes) == f.bytes.size());
     output.close();
-    PeFile* pe = [&] {
+    std::optional<PeFile> pe;
+    {
         PeFileDataSource source(path);
-        return PeFile::parse(source);
-    }();
+        pe.emplace(source);
+        pe->parse();
+    }
+    // Reading parsed results and destruction do not access the borrowed source.
     require(pe->isPe32Plus() && pe->imports().size() == 1 &&
             pe->exports()->entries().size() == 4);
-    delete pe;
 }
 
 void readFailuresThrow() {
@@ -666,9 +694,10 @@ void readFailuresThrow() {
                                f.foa(0x1660),
                                f.foa(0x14c0)};
         for (int offset : offsets)
-            expectFailure([&] {
-                return PeFile::parse(ArraySource(f.bytes, true, false,
-                                                 static_cast<quint64>(offset)));
+            expectFailure<PeDataSourceError>([&] {
+                return PeFile{ArraySource(f.bytes, true, false,
+                                          static_cast<quint64>(offset))}
+                    .parse();
             });
     }
 }
@@ -681,68 +710,77 @@ void componentParsers() {
         ArraySource source(f.bytes);
         ArraySource unreadable(f.bytes, true, true);
         const auto& file = f.parse();
-        auto* dos = PeDosHeader::parse(source);
-        require(dos->ntHeadersOffset() == Fixture::Nt);
-        delete dos;
-        auto* coff = PeFileHeader::parse(source, Fixture::Coff);
-        require(coff->numberOfSections() == 1);
-        delete coff;
+        DosHeader dos;
+        dos.parse(source);
+        require(dos.ntHeadersOffset() == Fixture::Nt);
+        FileHeader coff;
+        coff.parse(source, Fixture::Coff);
+        require(coff.numberOfSections() == 1);
         const quint16 size =
             file.ntHeaders().fileHeader().sizeOfOptionalHeader();
-        auto* optional =
-            PeOptionalHeader::parse(source, Fixture::Optional, size);
-        require(optional->isPe32Plus() == is64);
-        delete optional;
-        auto* nt = PeNtHeaders::parse(source, Fixture::Nt);
-        require(nt->optionalHeader().isPe32Plus() == is64);
-        delete nt;
-        auto* section = PeSection::parse(source, f.sectionOffset());
-        require(section->name() == QStringLiteral(".test"));
-        delete section;
-        auto* sections = PeSections::parse(source, f.sectionOffset(), 1,
-                                           file.ntHeaders().optionalHeader());
-        require(sections->items().size() == 1 &&
-                sections->items()[0] ==
-                    sections->findByName(QStringLiteral(".test")));
-        delete sections;
-        auto* imports = PeImportModule::parseAll(source, file);
-        require(imports->size() == 1 && imports->front().entries().size() == 2);
-        delete imports;
-        auto* exports = PeExports::parse(source, file);
-        require(exports->entries().size() == 4);
-        delete exports;
-        expectFailure([&] { return PeDosHeader::parse(unreadable); });
-        expectFailure(
-            [&] { return PeFileHeader::parse(unreadable, Fixture::Coff); });
-        expectFailure([&] {
-            return PeOptionalHeader::parse(unreadable, Fixture::Optional, size);
+        OptionalHeader optional;
+        optional.parse(source, Fixture::Optional, size);
+        require(optional.isPe32Plus() == is64);
+        NtHeaders nt;
+        nt.parse(source, Fixture::Nt);
+        require(nt.optionalHeader().isPe32Plus() == is64);
+        Section section;
+        section.parse(source, f.sectionOffset());
+        require(section.name() == QStringLiteral(".test"));
+        Sections sections;
+        sections.parse(source, f.sectionOffset(), 1,
+                       file.ntHeaders().optionalHeader());
+        require(sections.items().size() == 1 &&
+                sections.items()[0] ==
+                    sections.findByName(QStringLiteral(".test")));
+        Imports imports;
+        imports.parse(source, file);
+        require(imports.modules().size() == 1 &&
+                imports.modules().front().entries().size() == 2);
+        Exports exports;
+        exports.parse(source, file);
+        require(exports.isPresent() && exports.entries().size() == 4);
+        expectFailure<PeDataSourceError>([&] { dos.parse(unreadable); });
+        expectFailure<PeDataSourceError>(
+            [&] { coff.parse(unreadable, Fixture::Coff); });
+        expectFailure<PeDataSourceError>(
+            [&] { optional.parse(unreadable, Fixture::Optional, size); });
+        expectFailure<PeDataSourceError>(
+            [&] { nt.parse(unreadable, Fixture::Nt); });
+        expectFailure<PeDataSourceError>(
+            [&] { section.parse(unreadable, f.sectionOffset()); });
+        expectFailure<PeDataSourceError>([&] {
+            sections.parse(unreadable, f.sectionOffset(), 1,
+                           file.ntHeaders().optionalHeader());
         });
-        expectFailure(
-            [&] { return PeNtHeaders::parse(unreadable, Fixture::Nt); });
-        expectFailure(
-            [&] { return PeSection::parse(unreadable, f.sectionOffset()); });
-        expectFailure([&] {
-            return PeSections::parse(unreadable, f.sectionOffset(), 1,
-                                     file.ntHeaders().optionalHeader());
-        });
-        expectFailure(
-            [&] { return PeImportModule::parseAll(unreadable, file); });
-        expectFailure([&] { return PeExports::parse(unreadable, file); });
+        expectFailure<PeDataSourceError>(
+            [&] { imports.parse(unreadable, file); });
+        expectFailure<PeDataSourceError>(
+            [&] { exports.parse(unreadable, file); });
+        require(dos.magic() == IMAGE_DOS_SIGNATURE &&
+                coff.numberOfSections() == 1 && optional.isPe32Plus() == is64 &&
+                nt.optionalHeader().isPe32Plus() == is64 &&
+                section.name() == QStringLiteral(".test") &&
+                sections.items().size() == 1 && imports.modules().size() == 1 &&
+                exports.isPresent() && exports.entries().size() == 4);
+
+        // Reusing objects for a file with absent directories clears old data.
+        Fixture absent(is64);
+        ArraySource absentSource(absent.bytes);
+        const auto& absentFile = absent.parse();
+        imports.parse(absentSource, absentFile);
+        exports.parse(absentSource, absentFile);
+        require(imports.modules().empty() && !exports.isPresent() &&
+                exports.dllName().isEmpty() && exports.entries().empty() &&
+                exports.findByOrdinal(0x10000) == nullptr);
     }
-    Fixture absent;
-    ArraySource source(absent.bytes);
-    const auto& file = absent.parse();
-    auto* imports = PeImportModule::parseAll(source, file);
-    require(imports->empty());
-    delete imports;
-    require(PeExports::parse(source, file) == nullptr);
 }
 
 void exceptionDetails() {
-    using Code = PeParseError::Code;
+    using Code = ParseError::Code;
     Fixture f;
     auto error =
-        captureError([&] { PeFile::parse(ArraySource(f.bytes, false)); });
+        captureError([&] { PeFile{ArraySource(f.bytes, false)}.parse(); });
     require(error.code() == Code::UnsupportedLayout && !error.directoryIndex());
     auto bad = f;
     bad.put(0, 0, 2);
@@ -758,7 +796,7 @@ void exceptionDetails() {
     error = captureError([&] { bad.parse(); });
     require(error.code() == Code::UnsupportedFormat &&
             error.offset() == Fixture::Optional);
-    error = captureError([] { PeFile::parse(ArraySource(QByteArray())); });
+    error = captureError([] { PeFile{ArraySource(QByteArray())}.parse(); });
     require(error.code() == Code::TruncatedData && error.offset() == 0);
 
     f.imports();
@@ -767,22 +805,29 @@ void exceptionDetails() {
     bad.setDirectory(1, 0x1100, 20);
     error = captureError([&] { bad.parse(); });
     require(error.code() == Code::InvalidDirectory &&
-            error.directoryIndex() == 1);
+            error.offset() == quint64(f.foa(0x1100)) &&
+            !error.directoryIndex());
     bad = f;
     bad.putRva(0x1640, 4, 2);
     error = captureError([&] { bad.parse(); });
     require(error.code() == Code::InvalidDirectory &&
-            error.directoryIndex() == 0);
-    for (const auto& fault :
-         {std::make_pair(1, f.foa(0x1200)), std::make_pair(0, f.foa(0x1600))}) {
-        error = captureError([&] {
-            PeFile::parse(
-                ArraySource(f.bytes, true, false, quint64(fault.second)));
+            error.offset() == quint64(f.foa(0x1640)) &&
+            !error.directoryIndex());
+    bad = f;
+    bad.setDirectory(1, 0x1100, 0);
+    error = captureError([&] { bad.parse(); });
+    require(error.code() == Code::InvalidDirectory &&
+            error.directoryIndex() == 1);
+    for (int offset : {0, Fixture::Optional + 72, f.sectionOffset(),
+                       f.foa(0x1200), f.foa(0x1600)}) {
+        const auto sourceError = captureError<PeDataSourceError>([&] {
+            return PeFile{ArraySource(f.bytes, true, false, quint64(offset))}
+                .parse();
         });
-        require(error.code() == Code::DataSource &&
-                error.directoryIndex() == fault.first);
-        require(error.offset() == quint64(fault.second));
-        require(std::strlen(error.what()) > 0);
+        require(sourceError.code() == PeDataSourceError::Code::Io);
+        require(sourceError.offset() == quint64(offset));
+        require(sourceError.length() > 0 &&
+                std::strlen(sourceError.what()) > 0);
     }
 }
 
@@ -799,18 +844,54 @@ void ownershipCleanup() {
     ArraySource sectionFailure(invalidSection.bytes);
 
     const auto cycle = [&] {
-        PeFile* file = PeFile::parse(source);
+        source = ArraySource(f.bytes);
+        PeFile* file = new PeFile(source);
+        file->parse();
         require(file->dosHeader().magic() == 0x5a4d);
         require(file->ntHeaders().fileHeader().numberOfSections() == 1);
         require(file->sections().items()[0] ==
                 file->sections().findByRva(0x1000));
         require(file->imports().size() == 1 &&
                 file->exports()->entries().size() == 4);
+        const auto* oldNt = &file->ntHeaders();
+        const auto* oldSections = &file->sections();
+        const auto* oldExports = file->exports();
+        expectFailure<PeDataSourceError>([&] {
+            source = headerFailure;
+            file->parse();
+        });
+        expectFailure([&] {
+            source = sectionFailure;
+            file->parse();
+        });
+        expectFailure<PeDataSourceError>([&] {
+            source = importFailure;
+            file->parse();
+        });
+        expectFailure<PeDataSourceError>([&] {
+            source = exportFailure;
+            file->parse();
+        });
+        require(&file->ntHeaders() == oldNt &&
+                &file->sections() == oldSections &&
+                file->exports() == oldExports && file->isPe32Plus() &&
+                file->imports().size() == 1 &&
+                file->exports()->entries().size() == 4);
+        source = ArraySource(f.bytes);
+        file->parse();
+        Fixture absent;
+        source = ArraySource(absent.bytes);
+        file->parse();
+        require(!file->isPe32Plus() && file->imports().empty() &&
+                file->exports() == nullptr);
         delete file;
-        expectFailure([&] { return PeFile::parse(headerFailure); });
-        expectFailure([&] { return PeFile::parse(sectionFailure); });
-        expectFailure([&] { return PeFile::parse(importFailure); });
-        expectFailure([&] { return PeFile::parse(exportFailure); });
+        expectFailure<PeDataSourceError>(
+            [&] { return PeFile{headerFailure}.parse(); });
+        expectFailure([&] { return PeFile{sectionFailure}.parse(); });
+        expectFailure<PeDataSourceError>(
+            [&] { return PeFile{importFailure}.parse(); });
+        expectFailure<PeDataSourceError>(
+            [&] { return PeFile{exportFailure}.parse(); });
     };
     cycle();  // Initialize any runtime caches before checking allocations.
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -859,7 +940,8 @@ int main(int argc, char** argv) {
         PeFile* pe = nullptr;
         try {
             PeFileDataSource source(QString::fromLocal8Bit(argv[i]));
-            pe = PeFile::parse(source);
+            pe = new PeFile(source);
+            pe->parse();
             std::printf(
                 "PASS: %s: PE%s, %zu sections, %zu import modules, %zu "
                 "exports\n",

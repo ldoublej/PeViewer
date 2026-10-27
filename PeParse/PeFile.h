@@ -10,40 +10,36 @@
 
 class PeDataSource;
 
-// An owning, read-only snapshot. No data-source lifetime is required after
-// parse.
+// Owns parsed results and borrows the data source for each parse() call.
 class PeFile {
    public:
-    // The caller deletes PeFile; PeFile owns all parsed components.
-    static PeFile* parse(const PeDataSource& source);
+    // The source is borrowed and must remain valid whenever parse() is called.
+    explicit PeFile(const PeDataSource& source);
+    // Parses into this object; failure preserves the previous result.
+    void parse();
     ~PeFile();
 
     // All returned references and pointers are borrowed from this PeFile.
-    const PeDosHeader& dosHeader() const { return *m_dos; }
-    const PeNtHeaders& ntHeaders() const { return *m_nt; }
-    const PeSections& sections() const { return *m_sections; }
-    const std::vector<PeImportModule>& imports() const { return *m_imports; }
-    const PeExports* exports() const { return m_exports; }
+    const DosHeader& dosHeader() const { return *m_dos; }
+    const NtHeaders& ntHeaders() const { return *m_nt; }
+    const Sections& sections() const { return *m_sections; }
+    const std::vector<ImportModule>& imports() const {
+        return m_imports->modules();
+    }
+    const Exports* exports() const { return m_exports; }
     bool isPe32Plus() const { return m_nt->optionalHeader().isPe32Plus(); }
     quint64 imageBase() const { return m_nt->optionalHeader().imageBase(); }
     quint32 entryPointRva() const {
         return m_nt->optionalHeader().entryPointRva();
     }
-    quint64 fileSize() const { return m_fileSize; }
     std::optional<quint64> rvaToFileOffset(quint32 rva) const;
 
    private:
     Q_DISABLE_COPY_MOVE(PeFile)
-    PeFile() = default;
-    struct MappedRange {
-        quint64 offset;
-        quint64 size;
-    };
-    std::optional<MappedRange> mappedRange(quint32 rva) const;
-    PeDosHeader* m_dos = nullptr;
-    PeNtHeaders* m_nt = nullptr;
-    PeSections* m_sections = nullptr;
-    std::vector<PeImportModule>* m_imports = nullptr;
-    PeExports* m_exports = nullptr;
-    quint64 m_fileSize = 0;
+    const PeDataSource& m_source;
+    DosHeader* m_dos = nullptr;
+    NtHeaders* m_nt = nullptr;
+    Sections* m_sections = nullptr;
+    Imports* m_imports = nullptr;
+    Exports* m_exports = nullptr;
 };

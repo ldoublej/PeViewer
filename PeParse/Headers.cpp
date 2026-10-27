@@ -6,24 +6,24 @@
 
 #include "detail/ParseUtils.h"
 
-std::array<quint16, 4> PeDosHeader::reserved() const {
+std::array<quint16, 4> DosHeader::reserved() const {
     std::array<quint16, 4> result{};
     std::copy(std::begin(m_header.e_res), std::end(m_header.e_res),
               result.begin());
     return result;
 }
-std::array<quint16, 10> PeDosHeader::reserved2() const {
+std::array<quint16, 10> DosHeader::reserved2() const {
     std::array<quint16, 10> result{};
     std::copy(std::begin(m_header.e_res2), std::end(m_header.e_res2),
               result.begin());
     return result;
 }
-bool PeOptionalHeader::isPe32Plus() const {
+bool OptionalHeader::isPe32Plus() const {
     return std::holds_alternative<IMAGE_OPTIONAL_HEADER64>(m_header);
 }
 
 #define PE_OPTIONAL_GETTER(type, name, field)                            \
-    type PeOptionalHeader::name() const {                                \
+    type OptionalHeader::name() const {                                  \
         return std::visit([](const auto& h) -> type { return h.field; }, \
                           m_header);                                     \
     }
@@ -51,7 +51,7 @@ PE_OPTIONAL_GETTER(quint32, numberOfRvaAndSizes, NumberOfRvaAndSizes)
 #undef PE_OPTIONAL_GETTER
 
 #define PE_VERSION_GETTER(type, name, major, minor)             \
-    std::pair<type, type> PeOptionalHeader::name() const {      \
+    std::pair<type, type> OptionalHeader::name() const {        \
         return std::visit(                                      \
             [](const auto& h) {                                 \
                 return std::pair<type, type>{h.major, h.minor}; \
@@ -66,12 +66,12 @@ PE_VERSION_GETTER(quint16, subsystemVersion, MajorSubsystemVersion,
                   MinorSubsystemVersion)
 #undef PE_VERSION_GETTER
 
-std::optional<quint32> PeOptionalHeader::baseOfData() const {
+std::optional<quint32> OptionalHeader::baseOfData() const {
     if (const auto* h = std::get_if<IMAGE_OPTIONAL_HEADER32>(&m_header))
         return h->BaseOfData;
     return std::nullopt;
 }
-std::optional<IMAGE_DATA_DIRECTORY> PeOptionalHeader::dataDirectory(
+std::optional<IMAGE_DATA_DIRECTORY> OptionalHeader::dataDirectory(
     std::size_t index) const {
     if (index >= m_directories.size()) return std::nullopt;
     return m_directories[index];
@@ -79,7 +79,7 @@ std::optional<IMAGE_DATA_DIRECTORY> PeOptionalHeader::dataDirectory(
 
 using namespace PeParseDetail;
 namespace {
-using Code = PeParseError::Code;
+using Code = ParseError::Code;
 bool isPowerOfTwo(quint32 value) {
     return value != 0 && (value & (value - 1)) == 0;
 }
@@ -150,10 +150,9 @@ T readOptionalHeader(const PeDataSource& source, quint64 offset,
 
 }  // namespace
 
-PeDosHeader* PeDosHeader::parse(const PeDataSource& source) {
+void DosHeader::parse(const PeDataSource& source) {
     checkRange(source, 0, sizeof(IMAGE_DOS_HEADER));
-    PeDosHeader result;
-    auto& dos = result.m_header;
+    IMAGE_DOS_HEADER dos{};
     PE_READ(IMAGE_DOS_HEADER, dos, e_magic, 0);
     if (dos.e_magic != IMAGE_DOS_SIGNATURE)
         fail(Code::InvalidSignature,
@@ -186,15 +185,12 @@ PeDosHeader* PeDosHeader::parse(const PeDataSource& source) {
         fail(Code::InvalidHeader, QStringLiteral("Invalid e_lfanew"),
              offsetof(IMAGE_DOS_HEADER, e_lfanew));
 
-    auto* parsed = new PeDosHeader;
-    parsed->m_header = result.m_header;
-    return parsed;
+    m_header = dos;
 }
 
-PeFileHeader* PeFileHeader::parse(const PeDataSource& source, quint64 offset) {
+void FileHeader::parse(const PeDataSource& source, quint64 offset) {
     checkRange(source, offset, sizeof(IMAGE_FILE_HEADER));
-    PeFileHeader result;
-    auto& coff = result.m_header;
+    IMAGE_FILE_HEADER coff{};
     PE_READ(IMAGE_FILE_HEADER, coff, Machine, offset);
     PE_READ(IMAGE_FILE_HEADER, coff, NumberOfSections, offset);
     PE_READ(IMAGE_FILE_HEADER, coff, TimeDateStamp, offset);
@@ -202,26 +198,24 @@ PeFileHeader* PeFileHeader::parse(const PeDataSource& source, quint64 offset) {
     PE_READ(IMAGE_FILE_HEADER, coff, NumberOfSymbols, offset);
     PE_READ(IMAGE_FILE_HEADER, coff, SizeOfOptionalHeader, offset);
     PE_READ(IMAGE_FILE_HEADER, coff, Characteristics, offset);
-    auto* parsed = new PeFileHeader;
-    parsed->m_header = result.m_header;
-    return parsed;
+    m_header = coff;
 }
 
-PeOptionalHeader* PeOptionalHeader::parse(const PeDataSource& source,
-                                          quint64 offset,
-                                          quint16 declaredSize) {
-    PeOptionalHeader result;
+void OptionalHeader::parse(const PeDataSource& source, quint64 offset,
+                           quint16 declaredSize) {
+    std::variant<IMAGE_OPTIONAL_HEADER32, IMAGE_OPTIONAL_HEADER64> header;
+    std::vector<IMAGE_DATA_DIRECTORY> directories;
     checkRange(source, offset, declaredSize);
     if (declaredSize < 2)
         fail(Code::InvalidHeader,
              QStringLiteral("Missing optional header magic"), offset);
     const auto magic = readScalar<quint16>(source, offset);
     if (magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
-        result.m_header = readOptionalHeader<IMAGE_OPTIONAL_HEADER32>(
-            source, offset, declaredSize);
+        header = readOptionalHeader<IMAGE_OPTIONAL_HEADER32>(source, offset,
+                                                             declaredSize);
     } else if (magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
-        result.m_header = readOptionalHeader<IMAGE_OPTIONAL_HEADER64>(
-            source, offset, declaredSize);
+        header = readOptionalHeader<IMAGE_OPTIONAL_HEADER64>(source, offset,
+                                                             declaredSize);
     } else {
         fail(Code::UnsupportedFormat,
              QStringLiteral("Unsupported optional header magic %1").arg(magic),
@@ -232,61 +226,54 @@ PeOptionalHeader* PeOptionalHeader::parse(const PeDataSource& source,
             const quint32 count =
                 (std::min)(quint32(h.NumberOfRvaAndSizes),
                            quint32(IMAGE_NUMBEROF_DIRECTORY_ENTRIES));
-            result.m_directories.assign(h.DataDirectory,
-                                        h.DataDirectory + count);
+            directories.assign(h.DataDirectory, h.DataDirectory + count);
+            if (!isPowerOfTwo(h.FileAlignment) ||
+                !isPowerOfTwo(h.SectionAlignment) ||
+                h.FileAlignment > h.SectionAlignment)
+                fail(Code::InvalidHeader,
+                     QStringLiteral("Invalid file or section alignment"),
+                     offset);
+            if (h.SizeOfImage == 0 || h.SizeOfHeaders > h.SizeOfImage)
+                fail(Code::InvalidHeader,
+                     QStringLiteral("Invalid SizeOfImage or SizeOfHeaders"),
+                     offset);
         },
-        result.m_header);
-    const auto& optional = result;
-    if (!isPowerOfTwo(optional.fileAlignment()) ||
-        !isPowerOfTwo(optional.sectionAlignment()) ||
-        optional.fileAlignment() > optional.sectionAlignment())
-        fail(Code::InvalidHeader,
-             QStringLiteral("Invalid file or section alignment"), offset);
-    if (optional.sizeOfImage() == 0 ||
-        optional.sizeOfHeaders() > optional.sizeOfImage())
-        fail(Code::InvalidHeader,
-             QStringLiteral("Invalid SizeOfImage or SizeOfHeaders"), offset);
-    auto* parsed = new PeOptionalHeader;
-    parsed->m_header = result.m_header;
-    parsed->m_directories = std::move(result.m_directories);
-    return parsed;
+        header);
+    m_header = header;
+    m_directories = std::move(directories);
 }
 
-PeNtHeaders::~PeNtHeaders() {
+NtHeaders::~NtHeaders() {
     delete m_optional;
     delete m_file;
 }
 
-PeNtHeaders* PeNtHeaders::parse(const PeDataSource& source, quint64 offset) {
+void NtHeaders::parse(const PeDataSource& source, quint64 offset) {
     checkRange(source, offset, 4 + sizeof(IMAGE_FILE_HEADER));
-    auto* result = new PeNtHeaders;
-    try {
-        result->m_signature = readScalar<quint32>(source, offset);
-        if (result->m_signature != IMAGE_NT_SIGNATURE)
-            fail(Code::InvalidSignature,
-                 QStringLiteral("Invalid NT signature; expected PE\\0\\0"),
-                 offset);
-        result->m_file = PeFileHeader::parse(source, offset + 4);
-        const quint64 optionalOffset = offset + 4 + sizeof(IMAGE_FILE_HEADER);
-        result->m_optional = PeOptionalHeader::parse(
-            source, optionalOffset, result->m_file->sizeOfOptionalHeader());
-        const quint64 sectionOffset = offset + result->totalSize();
-        const quint64 sectionBytes =
-            quint64(result->m_file->numberOfSections()) *
-            sizeof(IMAGE_SECTION_HEADER);
-        const quint64 headersSize = result->m_optional->sizeOfHeaders();
-        if (sectionOffset > headersSize ||
-            sectionBytes > headersSize - sectionOffset)
-            fail(Code::InvalidHeader,
-                 QStringLiteral(
-                     "SizeOfHeaders does not cover the section table"),
-                 optionalOffset);
-        checkRange(source, 0, headersSize);
-        return result;
-    } catch (...) {
-        delete result;
-        throw;
-    }
+    NtHeaders result;
+    result.m_signature = readScalar<quint32>(source, offset);
+    if (result.m_signature != IMAGE_NT_SIGNATURE)
+        fail(Code::InvalidSignature,
+             QStringLiteral("Invalid NT signature; expected PE\\0\\0"), offset);
+    result.m_file = new FileHeader;
+    result.m_file->parse(source, offset + 4);
+    const quint64 optionalOffset = offset + 4 + sizeof(IMAGE_FILE_HEADER);
+    result.m_optional = new OptionalHeader;
+    result.m_optional->parse(source, optionalOffset,
+                             result.m_file->sizeOfOptionalHeader());
+    const quint64 sectionOffset = offset + result.totalSize();
+    const quint64 sectionBytes = quint64(result.m_file->numberOfSections()) *
+                                 sizeof(IMAGE_SECTION_HEADER);
+    const quint64 headersSize = result.m_optional->sizeOfHeaders();
+    if (sectionOffset > headersSize ||
+        sectionBytes > headersSize - sectionOffset)
+        fail(Code::InvalidHeader,
+             QStringLiteral("SizeOfHeaders does not cover the section table"),
+             optionalOffset);
+    checkRange(source, 0, headersSize);
+    m_signature = result.m_signature;
+    std::swap(m_file, result.m_file);
+    std::swap(m_optional, result.m_optional);
 }
 
 #undef PE_READ

@@ -16,7 +16,7 @@ inline constexpr quint32 MaxSections = 4096;
 inline constexpr quint64 MaxStringLength = 4096;
 inline constexpr quint64 MaxStringBytes = 16 * 1024 * 1024;
 
-[[noreturn]] void fail(PeParseError::Code code, const QString& message,
+[[noreturn]] void fail(ParseError::Code code, const QString& message,
                        std::optional<quint64> offset = std::nullopt,
                        std::optional<int> directoryIndex = std::nullopt);
 void checkRange(const PeDataSource& source, quint64 offset, quint64 size);

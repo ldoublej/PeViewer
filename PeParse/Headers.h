@@ -13,11 +13,12 @@
 
 class PeDataSource;
 
-// parse() returns a caller-owned pointer and throws PeParseError on failure.
+// parse() updates this object on success and propagates exceptions on failure.
 
-class PeDosHeader {
+class DosHeader {
    public:
-    static PeDosHeader* parse(const PeDataSource& source);
+    DosHeader() = default;
+    void parse(const PeDataSource& source);
     quint16 magic() const { return m_header.e_magic; }
     quint32 ntHeadersOffset() const {
         return static_cast<quint32>(m_header.e_lfanew);
@@ -41,14 +42,14 @@ class PeDosHeader {
     std::array<quint16, 10> reserved2() const;
 
    private:
-    Q_DISABLE_COPY_MOVE(PeDosHeader)
-    PeDosHeader() = default;
+    Q_DISABLE_COPY_MOVE(DosHeader)
     IMAGE_DOS_HEADER m_header{};
 };
 
-class PeFileHeader {
+class FileHeader {
    public:
-    static PeFileHeader* parse(const PeDataSource& source, quint64 offset);
+    FileHeader() = default;
+    void parse(const PeDataSource& source, quint64 offset);
     quint16 machine() const { return m_header.Machine; }
     quint16 numberOfSections() const { return m_header.NumberOfSections; }
     quint32 timeDateStamp() const { return m_header.TimeDateStamp; }
@@ -62,15 +63,15 @@ class PeFileHeader {
     quint16 characteristics() const { return m_header.Characteristics; }
 
    private:
-    Q_DISABLE_COPY_MOVE(PeFileHeader)
-    PeFileHeader() = default;
+    Q_DISABLE_COPY_MOVE(FileHeader)
     IMAGE_FILE_HEADER m_header{};
 };
 
-class PeOptionalHeader {
+class OptionalHeader {
    public:
-    static PeOptionalHeader* parse(const PeDataSource& source, quint64 offset,
-                                   quint16 declaredSize);
+    OptionalHeader() = default;
+    void parse(const PeDataSource& source, quint64 offset,
+               quint16 declaredSize);
     bool isPe32Plus() const;
     quint16 magic() const;
     std::pair<quint8, quint8> linkerVersion() const;
@@ -104,29 +105,28 @@ class PeOptionalHeader {
     }
 
    private:
-    Q_DISABLE_COPY_MOVE(PeOptionalHeader)
-    PeOptionalHeader() = default;
+    Q_DISABLE_COPY_MOVE(OptionalHeader)
     std::variant<IMAGE_OPTIONAL_HEADER32, IMAGE_OPTIONAL_HEADER64> m_header{
         IMAGE_OPTIONAL_HEADER32{}};
     std::vector<IMAGE_DATA_DIRECTORY> m_directories;
 };
 
-class PeNtHeaders {
+class NtHeaders {
    public:
     // Owns the parsed COFF and optional headers.
-    static PeNtHeaders* parse(const PeDataSource& source, quint64 offset);
-    ~PeNtHeaders();
+    NtHeaders() = default;
+    void parse(const PeDataSource& source, quint64 offset);
+    ~NtHeaders();
     quint32 signature() const { return m_signature; }
     quint64 totalSize() const {
         return 4 + 20 + quint64(m_file->sizeOfOptionalHeader());
     }
-    const PeFileHeader& fileHeader() const { return *m_file; }
-    const PeOptionalHeader& optionalHeader() const { return *m_optional; }
+    const FileHeader& fileHeader() const { return *m_file; }
+    const OptionalHeader& optionalHeader() const { return *m_optional; }
 
    private:
-    Q_DISABLE_COPY_MOVE(PeNtHeaders)
-    PeNtHeaders() = default;
+    Q_DISABLE_COPY_MOVE(NtHeaders)
     quint32 m_signature = 0;
-    PeFileHeader* m_file = nullptr;
-    PeOptionalHeader* m_optional = nullptr;
+    FileHeader* m_file = nullptr;
+    OptionalHeader* m_optional = nullptr;
 };

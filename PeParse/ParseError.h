@@ -5,7 +5,7 @@
 #include <optional>
 #include <stdexcept>
 
-class PeParseError : public std::runtime_error {
+class ParseError : public std::runtime_error {
    public:
     enum class Code {
         TruncatedData,
@@ -19,9 +19,9 @@ class PeParseError : public std::runtime_error {
         LimitExceeded,
         DataSource
     };
-    PeParseError(Code code, const QString& message,
-                 std::optional<quint64> offset = std::nullopt,
-                 std::optional<int> directoryIndex = std::nullopt);
+    ParseError(Code code, const QString& message,
+               std::optional<quint64> offset = std::nullopt,
+               std::optional<int> directoryIndex = std::nullopt);
     Code code() const noexcept { return m_code; }
     std::optional<quint64> offset() const noexcept { return m_offset; }
     std::optional<int> directoryIndex() const noexcept { return m_directory; }
