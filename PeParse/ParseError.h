@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 class ParseError : public std::runtime_error {
-   public:
+public:
     enum class Code {
         TruncatedData,
         InvalidSignature,
@@ -19,14 +19,13 @@ class ParseError : public std::runtime_error {
         LimitExceeded,
         DataSource
     };
-    ParseError(Code code, const QString& message,
-               std::optional<quint64> offset = std::nullopt,
+    ParseError(Code code, const QString& message, std::optional<quint64> offset = std::nullopt,
                std::optional<int> directoryIndex = std::nullopt);
     Code code() const noexcept { return m_code; }
     std::optional<quint64> offset() const noexcept { return m_offset; }
     std::optional<int> directoryIndex() const noexcept { return m_directory; }
 
-   private:
+private:
     Code m_code;
     std::optional<quint64> m_offset;
     std::optional<int> m_directory;

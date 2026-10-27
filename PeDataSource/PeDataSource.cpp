@@ -2,8 +2,8 @@
 
 #include <limits>
 
-PeDataSourceError::PeDataSourceError(Code code, const QString& message,
-                                     quint64 offset, std::size_t length)
+PeDataSourceError::PeDataSourceError(Code code, const QString& message, quint64 offset,
+                                     std::size_t length)
     : std::runtime_error(message.toUtf8().constData()),
       m_code(code),
       m_offset(offset),
@@ -34,8 +34,7 @@ quint64 PeDataSource::readU64(quint64 offset) const {
 
 QByteArray PeDataSource::readBytes(quint64 offset, std::size_t count) const {
     if (count > static_cast<std::size_t>(std::numeric_limits<int>::max()))
-        throw std::length_error(
-            "Requested byte array exceeds QByteArray capacity");
+        throw std::length_error("Requested byte array exceeds QByteArray capacity");
 
     QByteArray bytes(static_cast<int>(count), Qt::Uninitialized);
     readExact(offset, bytes.data(), count);
@@ -49,27 +48,21 @@ QString PeDataSource::readAscii(quint64 offset, std::size_t maxLength) const {
     return QString::fromUtf8(bytes.constData(), length);
 }
 
-QString PeDataSource::readUtf16(quint64 offset,
-                                std::size_t maxCodeUnits) const {
-    if (maxCodeUnits >
-        static_cast<std::size_t>(std::numeric_limits<int>::max()) / 2)
-        throw std::length_error(
-            "Requested UTF-16 string exceeds QByteArray capacity");
+QString PeDataSource::readUtf16(quint64 offset, std::size_t maxCodeUnits) const {
+    if (maxCodeUnits > static_cast<std::size_t>(std::numeric_limits<int>::max()) / 2)
+        throw std::length_error("Requested UTF-16 string exceeds QByteArray capacity");
 
     const QByteArray bytes = readBytes(offset, maxCodeUnits * 2);
     QString text;
     text.reserve(static_cast<int>(maxCodeUnits));
     for (int i = 0; i < bytes.size(); i += 2) {
-        const auto unit =
-            static_cast<quint16>(static_cast<quint8>(bytes[i])) |
-            (static_cast<quint16>(static_cast<quint8>(bytes[i + 1])) << 8);
+        const auto unit = static_cast<quint16>(static_cast<quint8>(bytes[i])) |
+                          (static_cast<quint16>(static_cast<quint8>(bytes[i + 1])) << 8);
         if (unit == 0) break;
         if (QChar::isHighSurrogate(unit)) {
             if (i + 3 < bytes.size()) {
-                const auto next =
-                    static_cast<quint16>(static_cast<quint8>(bytes[i + 2])) |
-                    (static_cast<quint16>(static_cast<quint8>(bytes[i + 3]))
-                     << 8);
+                const auto next = static_cast<quint16>(static_cast<quint8>(bytes[i + 2])) |
+                                  (static_cast<quint16>(static_cast<quint8>(bytes[i + 3])) << 8);
                 if (QChar::isLowSurrogate(next)) {
                     text.append(QChar(unit));
                     text.append(QChar(next));

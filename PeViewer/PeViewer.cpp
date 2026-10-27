@@ -30,18 +30,15 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     updateLanguageActions();
 }
 
-PeViewer::~PeViewer() {
-
-}
+PeViewer::~PeViewer() {}
 
 void PeViewer::on_actionOpen_triggered(bool b) {
     QString fileName = QFileDialog::getOpenFileName(this);
     QFileInfo fileInfo(fileName);
-    if (!fileInfo.exists())
-        return;
-    
+    if (!fileInfo.exists()) return;
+
     PeFileDataSource* dataSource = new PeFileDataSource(fileName);
-    PeFile * peFile = new PeFile(*dataSource);
+    PeFile* peFile = new PeFile(*dataSource);
     peFile->parse();
 }
 
@@ -56,8 +53,6 @@ void PeViewer::retranslateUi() {
 }
 
 void PeViewer::updateLanguageActions() {
-    ui.actionEnglish->setChecked(m_languageManager.language() ==
-                                 QStringLiteral("en"));
-    ui.actionSimplifiedChinese->setChecked(m_languageManager.language() ==
-                                           QStringLiteral("zh_CN"));
+    ui.actionEnglish->setChecked(m_languageManager.language() == QStringLiteral("en"));
+    ui.actionSimplifiedChinese->setChecked(m_languageManager.language() == QStringLiteral("zh_CN"));
 }

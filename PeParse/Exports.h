@@ -15,7 +15,7 @@ class PeDataSource;
 class PeFile;
 
 class ExportEntry {
-   public:
+public:
     enum class Kind { Empty, Function, Forwarder };
     Kind kind() const { return m_kind; }
     quint32 ordinal() const { return m_ordinal; }
@@ -24,7 +24,7 @@ class ExportEntry {
     quint32 rva() const { return m_rva; }
     const QString& forwarder() const { return m_forwarder; }
 
-   private:
+private:
     friend class Exports;
     Kind m_kind = Kind::Empty;
     quint32 m_ordinal = 0;
@@ -34,7 +34,7 @@ class ExportEntry {
 };
 
 class Exports {
-   public:
+public:
     Exports() = default;
     // Missing exports clear this object; malformed input propagates an
     // exception.
@@ -56,15 +56,12 @@ class Exports {
     quint32 numberOfNames() const { return m_header.NumberOfNames; }
     quint32 addressOfFunctions() const { return m_header.AddressOfFunctions; }
     quint32 addressOfNames() const { return m_header.AddressOfNames; }
-    quint32 addressOfNameOrdinals() const {
-        return m_header.AddressOfNameOrdinals;
-    }
+    quint32 addressOfNameOrdinals() const { return m_header.AddressOfNameOrdinals; }
 
-   private:
+private:
     friend class PeFile;
     Q_DISABLE_COPY_MOVE(Exports)
-    void parse(const PeDataSource& source, const PeFile& file,
-               quint64& stringBytes);
+    void parse(const PeDataSource& source, const PeFile& file, quint64& stringBytes);
     IMAGE_EXPORT_DIRECTORY m_header{};
     QString m_name;
     std::vector<ExportEntry> m_entries;

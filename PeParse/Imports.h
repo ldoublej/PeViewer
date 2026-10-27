@@ -11,7 +11,7 @@ class PeDataSource;
 class PeFile;
 
 class ImportEntry {
-   public:
+public:
     enum class Kind { Name, Ordinal };
     Kind kind() const { return m_kind; }
     const QString& name() const { return m_name; }
@@ -21,7 +21,7 @@ class ImportEntry {
     quint64 lookupValue() const { return m_lookupValue; }
     quint64 iatValue() const { return m_iatValue; }
 
-   private:
+private:
     friend class Imports;
     Kind m_kind = Kind::Name;
     QString m_name;
@@ -33,7 +33,7 @@ class ImportEntry {
 };
 
 class ImportModule {
-   public:
+public:
     const QString& dllName() const;
     const std::vector<ImportEntry>& entries() const;
     quint32 originalFirstThunk() const { return m_originalFirstThunk; }
@@ -42,7 +42,7 @@ class ImportModule {
     quint32 forwarderChain() const { return m_forwarderChain; }
     quint32 nameRva() const { return m_nameRva; }
 
-   private:
+private:
     friend class Imports;
     QString m_name;
     std::vector<ImportEntry> m_entries;
@@ -54,15 +54,14 @@ class ImportModule {
 };
 
 class Imports {
-   public:
+public:
     Imports() = default;
     void parse(const PeDataSource& source, const PeFile& file);
     const std::vector<ImportModule>& modules() const { return m_modules; }
 
-   private:
+private:
     friend class PeFile;
     Q_DISABLE_COPY_MOVE(Imports)
-    void parse(const PeDataSource& source, const PeFile& file,
-               quint64& stringBytes);
+    void parse(const PeDataSource& source, const PeFile& file, quint64& stringBytes);
     std::vector<ImportModule> m_modules;
 };

@@ -16,13 +16,11 @@ class PeDataSource;
 // parse() updates this object on success and propagates exceptions on failure.
 
 class DosHeader {
-   public:
+public:
     DosHeader() = default;
     void parse(const PeDataSource& source);
     quint16 magic() const { return m_header.e_magic; }
-    quint32 ntHeadersOffset() const {
-        return static_cast<quint32>(m_header.e_lfanew);
-    }
+    quint32 ntHeadersOffset() const { return static_cast<quint32>(m_header.e_lfanew); }
     quint16 bytesOnLastPage() const { return m_header.e_cblp; }
     quint16 pagesInFile() const { return m_header.e_cp; }
     quint16 relocations() const { return m_header.e_crlc; }
@@ -41,37 +39,32 @@ class DosHeader {
     std::array<quint16, 4> reserved() const;
     std::array<quint16, 10> reserved2() const;
 
-   private:
+private:
     Q_DISABLE_COPY_MOVE(DosHeader)
     IMAGE_DOS_HEADER m_header{};
 };
 
 class FileHeader {
-   public:
+public:
     FileHeader() = default;
     void parse(const PeDataSource& source, quint64 offset);
     quint16 machine() const { return m_header.Machine; }
     quint16 numberOfSections() const { return m_header.NumberOfSections; }
     quint32 timeDateStamp() const { return m_header.TimeDateStamp; }
-    quint32 pointerToSymbolTable() const {
-        return m_header.PointerToSymbolTable;
-    }
+    quint32 pointerToSymbolTable() const { return m_header.PointerToSymbolTable; }
     quint32 numberOfSymbols() const { return m_header.NumberOfSymbols; }
-    quint16 sizeOfOptionalHeader() const {
-        return m_header.SizeOfOptionalHeader;
-    }
+    quint16 sizeOfOptionalHeader() const { return m_header.SizeOfOptionalHeader; }
     quint16 characteristics() const { return m_header.Characteristics; }
 
-   private:
+private:
     Q_DISABLE_COPY_MOVE(FileHeader)
     IMAGE_FILE_HEADER m_header{};
 };
 
 class OptionalHeader {
-   public:
+public:
     OptionalHeader() = default;
-    void parse(const PeDataSource& source, quint64 offset,
-               quint16 declaredSize);
+    void parse(const PeDataSource& source, quint64 offset, quint16 declaredSize);
     bool isPe32Plus() const;
     quint16 magic() const;
     std::pair<quint8, quint8> linkerVersion() const;
@@ -100,11 +93,9 @@ class OptionalHeader {
     quint32 loaderFlags() const;
     quint32 numberOfRvaAndSizes() const;
     std::optional<IMAGE_DATA_DIRECTORY> dataDirectory(std::size_t index) const;
-    const std::vector<IMAGE_DATA_DIRECTORY>& dataDirectories() const {
-        return m_directories;
-    }
+    const std::vector<IMAGE_DATA_DIRECTORY>& dataDirectories() const { return m_directories; }
 
-   private:
+private:
     Q_DISABLE_COPY_MOVE(OptionalHeader)
     std::variant<IMAGE_OPTIONAL_HEADER32, IMAGE_OPTIONAL_HEADER64> m_header{
         IMAGE_OPTIONAL_HEADER32{}};
@@ -112,19 +103,17 @@ class OptionalHeader {
 };
 
 class NtHeaders {
-   public:
+public:
     // Owns the parsed COFF and optional headers.
     NtHeaders() = default;
     void parse(const PeDataSource& source, quint64 offset);
     ~NtHeaders();
     quint32 signature() const { return m_signature; }
-    quint64 totalSize() const {
-        return 4 + 20 + quint64(m_file->sizeOfOptionalHeader());
-    }
+    quint64 totalSize() const { return 4 + 20 + quint64(m_file->sizeOfOptionalHeader()); }
     const FileHeader& fileHeader() const { return *m_file; }
     const OptionalHeader& optionalHeader() const { return *m_optional; }
 
-   private:
+private:
     Q_DISABLE_COPY_MOVE(NtHeaders)
     quint32 m_signature = 0;
     FileHeader* m_file = nullptr;

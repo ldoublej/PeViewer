@@ -1,6 +1,6 @@
 #pragma once
 
 class WorkspaceManager {
-   public:
+public:
     WorkspaceManager();
 };

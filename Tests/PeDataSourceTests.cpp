@@ -54,25 +54,21 @@ int main() {
     require(source.readBytes(100, 0).isEmpty());
 
     source.readExact(100, nullptr, 0);
-    expectError(PeDataSourceError::Code::OutOfBounds,
-                [&] { source.readBytes(14, 2); });
+    expectError(PeDataSourceError::Code::OutOfBounds, [&] { source.readBytes(14, 2); });
     expectError(PeDataSourceError::Code::OutOfBounds,
                 [&] { source.readU16(std::numeric_limits<quint64>::max()); });
     expectError(PeDataSourceError::Code::Io, [&] {
-        PeFileDataSource missing(
-            directory.filePath(QStringLiteral("missing.pe")));
+        PeFileDataSource missing(directory.filePath(QStringLiteral("missing.pe")));
     });
 
-    const QString unicodePath =
-        directory.filePath(QStringLiteral("unicode.bin"));
+    const QString unicodePath = directory.filePath(QStringLiteral("unicode.bin"));
     QFile unicodeFile(unicodePath);
     require(unicodeFile.open(QIODevice::WriteOnly));
     const QByteArray unicodeBytes("\x3d\xd8\x00\xde\x00\xd8\x00\x00", 8);
     require(unicodeFile.write(unicodeBytes) == unicodeBytes.size());
     unicodeFile.close();
     PeFileDataSource unicodeSource(unicodePath);
-    require(unicodeSource.readUtf16(0, 4) ==
-            QString::fromUtf8("\xf0\x9f\x98\x80\xef\xbf\xbd"));
+    require(unicodeSource.readUtf16(0, 4) == QString::fromUtf8("\xf0\x9f\x98\x80\xef\xbf\xbd"));
 
     std::thread first([&] {
         for (int i = 0; i < 100; ++i) require(source.readU16(0) == 0x5a4d);

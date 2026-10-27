@@ -18,8 +18,7 @@
 namespace {
 template <typename T>
 constexpr bool copyMoveDisabled =
-    !std::is_copy_constructible<T>::value &&
-    !std::is_copy_assignable<T>::value &&
+    !std::is_copy_constructible<T>::value && !std::is_copy_assignable<T>::value &&
     !std::is_move_constructible<T>::value && !std::is_move_assignable<T>::value;
 
 static_assert(copyMoveDisabled<PeFile>);
@@ -33,25 +32,17 @@ static_assert(copyMoveDisabled<Exports>);
 static_assert(copyMoveDisabled<Imports>);
 
 static_assert(std::is_member_function_pointer<decltype(&PeFile::parse)>::value);
-static_assert(
-    std::is_member_function_pointer<decltype(&DosHeader::parse)>::value);
-static_assert(
-    std::is_member_function_pointer<decltype(&FileHeader::parse)>::value);
-static_assert(
-    std::is_member_function_pointer<decltype(&OptionalHeader::parse)>::value);
-static_assert(
-    std::is_member_function_pointer<decltype(&NtHeaders::parse)>::value);
-static_assert(
-    std::is_member_function_pointer<decltype(&Section::parse)>::value);
-static_assert(
-    std::is_member_function_pointer<decltype(&Sections::parse)>::value);
+static_assert(std::is_member_function_pointer<decltype(&DosHeader::parse)>::value);
+static_assert(std::is_member_function_pointer<decltype(&FileHeader::parse)>::value);
+static_assert(std::is_member_function_pointer<decltype(&OptionalHeader::parse)>::value);
+static_assert(std::is_member_function_pointer<decltype(&NtHeaders::parse)>::value);
+static_assert(std::is_member_function_pointer<decltype(&Section::parse)>::value);
+static_assert(std::is_member_function_pointer<decltype(&Sections::parse)>::value);
 static_assert(std::is_member_function_pointer<
-              decltype(static_cast<void (Imports::*)(const PeDataSource&,
-                                                     const PeFile&)>(
+              decltype(static_cast<void (Imports::*)(const PeDataSource&, const PeFile&)>(
                   &Imports::parse))>::value);
 static_assert(std::is_member_function_pointer<
-              decltype(static_cast<void (Exports::*)(const PeDataSource&,
-                                                     const PeFile&)>(
+              decltype(static_cast<void (Exports::*)(const PeDataSource&, const PeFile&)>(
                   &Exports::parse))>::value);
 
 void require(bool condition, const char* message = "PeParse assertion failed") {
@@ -59,37 +50,30 @@ void require(bool condition, const char* message = "PeParse assertion failed") {
 }
 
 class ArraySource final : public PeDataSource {
-   public:
-    explicit ArraySource(QByteArray bytes, bool fileLayout = true,
-                         bool failReads = false,
+public:
+    explicit ArraySource(QByteArray bytes, bool fileLayout = true, bool failReads = false,
                          std::optional<quint64> failAt = std::nullopt)
         : m_bytes(std::move(bytes)),
           m_fileLayout(fileLayout),
           m_failReads(failReads),
           m_failAt(failAt) {}
-    quint64 length() const override {
-        return static_cast<quint64>(m_bytes.size());
-    }
+    quint64 length() const override { return static_cast<quint64>(m_bytes.size()); }
     bool isFileAligned() const override { return m_fileLayout; }
     quint64 imageBase() const override { return 0; }
     QString url() const override { return QStringLiteral("test://pe"); }
-    void readExact(quint64 offset, char* buffer,
-                   std::size_t count) const override {
+    void readExact(quint64 offset, char* buffer, std::size_t count) const override {
         if (count == 0) return;
         if (!buffer || offset > length() || count > length() - offset)
             throw PeDataSourceError(PeDataSourceError::Code::OutOfBounds,
-                                    QStringLiteral("test source bounds"),
-                                    offset, count);
-        if (m_failReads ||
-            (m_failAt && offset <= *m_failAt && count > *m_failAt - offset))
+                                    QStringLiteral("test source bounds"), offset, count);
+        if (m_failReads || (m_failAt && offset <= *m_failAt && count > *m_failAt - offset))
             throw PeDataSourceError(PeDataSourceError::Code::Io,
                                     QStringLiteral("injected read failure"),
                                     m_failAt.value_or(offset), count);
-        std::memcpy(buffer, m_bytes.constData() + static_cast<int>(offset),
-                    count);
+        std::memcpy(buffer, m_bytes.constData() + static_cast<int>(offset), count);
     }
 
-   private:
+private:
     QByteArray m_bytes;
     bool m_fileLayout;
     bool m_failReads;
@@ -167,18 +151,14 @@ struct Fixture {
     int directoryCountOffset() const { return Optional + (is64 ? 108 : 92); }
     int directoriesOffset() const { return directoryCountOffset() + 4; }
     int foa(quint32 rva) const {
-        return rva < 0x200 ? static_cast<int>(rva)
-                           : static_cast<int>(rva - 0x1000 + 0x200);
+        return rva < 0x200 ? static_cast<int>(rva) : static_cast<int>(rva - 0x1000 + 0x200);
     }
     void put(int offset, quint64 value, int width = 4) {
-        require(offset >= 0 && offset + width <= bytes.size(),
-                "fixture write out of range");
+        require(offset >= 0 && offset + width <= bytes.size(), "fixture write out of range");
         for (int i = 0; i < width; ++i)
             bytes[offset + i] = static_cast<char>((value >> (i * 8)) & 0xff);
     }
-    void putRva(quint32 rva, quint64 value, int width = 4) {
-        put(foa(rva), value, width);
-    }
+    void putRva(quint32 rva, quint64 value, int width = 4) { put(foa(rva), value, width); }
     void text(int offset, const char* value) {
         const auto size = std::strlen(value) + 1;
         require(offset >= 0 && quint64(offset) + size <= quint64(bytes.size()),
@@ -199,8 +179,7 @@ struct Fixture {
         text(foa(0x11c0), "KERNEL32.dll");
         const int width = is64 ? 8 : 4;
         const quint64 ordinal =
-            (is64 ? Q_UINT64_C(0x8000000000000000) : Q_UINT64_C(0x80000000)) |
-            0x42;
+            (is64 ? Q_UINT64_C(0x8000000000000000) : Q_UINT64_C(0x80000000)) | 0x42;
         putRva(0x1200, 0x1280, width);
         putRva(0x1200 + width, ordinal, width);
         putRva(0x1240, 0x1280, width);
@@ -275,37 +254,26 @@ void headersAndMapping() {
         const auto& nt = pe.ntHeaders();
         const auto& optional = nt.optionalHeader();
         require(pe.isPe32Plus() == is64);
-        require(pe.dosHeader().magic() == 0x5a4d &&
-                pe.dosHeader().ntHeadersOffset() == 0x80);
-        require(pe.dosHeader().reserved()[0] == 0x1234 &&
-                pe.dosHeader().reserved2()[0] == 0x5678);
-        require(nt.signature() == 0x4550 &&
-                nt.totalSize() == quint64(is64 ? 264 : 248));
+        require(pe.dosHeader().magic() == 0x5a4d && pe.dosHeader().ntHeadersOffset() == 0x80);
+        require(pe.dosHeader().reserved()[0] == 0x1234 && pe.dosHeader().reserved2()[0] == 0x5678);
+        require(nt.signature() == 0x4550 && nt.totalSize() == quint64(is64 ? 264 : 248));
         require(nt.fileHeader().machine() == (is64 ? 0x8664 : 0x14c));
         require(nt.fileHeader().timeDateStamp() == 0x12345678 &&
                 nt.fileHeader().characteristics() == 0x2102);
         require(pe.imageBase() == (is64 ? Q_UINT64_C(0x140000000) : 0x400000));
         require(pe.entryPointRva() == 0x10f0);
-        require(optional.baseOfData() ==
-                (is64 ? std::nullopt : std::optional<quint32>(0x2000)));
-        require(optional.sizeOfStackReserve() ==
-                (is64 ? Q_UINT64_C(0x100000000) : 0x100000));
-        require(optional.sizeOfStackCommit() == 0x1000 &&
-                optional.sizeOfHeapReserve() == 0x200000);
-        require(optional.linkerVersion() ==
-                std::make_pair(quint8(14), quint8(7)));
-        require(optional.dataDirectories().size() == 16 &&
-                !optional.dataDirectory(16));
+        require(optional.baseOfData() == (is64 ? std::nullopt : std::optional<quint32>(0x2000)));
+        require(optional.sizeOfStackReserve() == (is64 ? Q_UINT64_C(0x100000000) : 0x100000));
+        require(optional.sizeOfStackCommit() == 0x1000 && optional.sizeOfHeapReserve() == 0x200000);
+        require(optional.linkerVersion() == std::make_pair(quint8(14), quint8(7)));
+        require(optional.dataDirectories().size() == 16 && !optional.dataDirectory(16));
         require(pe.imports().empty() && !pe.exports());
         require(pe.sections().items().size() == 1);
         const auto* section = pe.sections().findByName(QStringLiteral(".test"));
         require(section && section->characteristics() == 0x60000020);
-        require(pe.rvaToFileOffset(0x80) == 0x80 &&
-                !pe.sections().rvaToFileOffset(0x80));
-        require(pe.rvaToFileOffset(0x1000) == 0x200 &&
-                pe.rvaToFileOffset(0x1fff) == 0x11ff);
-        require(pe.sections().findByRva(0x2100) == section &&
-                !pe.rvaToFileOffset(0x2100));
+        require(pe.rvaToFileOffset(0x80) == 0x80 && !pe.sections().rvaToFileOffset(0x80));
+        require(pe.rvaToFileOffset(0x1000) == 0x200 && pe.rvaToFileOffset(0x1fff) == 0x11ff);
+        require(pe.sections().findByRva(0x2100) == section && !pe.rvaToFileOffset(0x2100));
         require(!pe.rvaToFileOffset(0x200) && !pe.rvaToFileOffset(0xffffffff));
         require(!pe.sections().findByRva(0x2200) &&
                 !pe.sections().findByName(QStringLiteral("missing")));
@@ -320,8 +288,7 @@ void optionalHeaderBounds() {
         const int fixed = is64 ? 112 : 96;
         f.put(f.directoryCountOffset(), 0);
         f.put(Fixture::Coff + 16, fixed, 2);
-        std::memcpy(f.bytes.data() + Fixture::Optional + fixed,
-                    section.constData(), 40);
+        std::memcpy(f.bytes.data() + Fixture::Optional + fixed, section.constData(), 40);
         const auto& pe = f.parse();
         require(pe.ntHeaders().optionalHeader().dataDirectories().empty());
         require(pe.sections().findByName(QStringLiteral(".test")) != nullptr);
@@ -332,8 +299,7 @@ void optionalHeaderBounds() {
     }
     Fixture f;
     f.put(f.directoryCountOffset(), 0xffffffff);
-    require(f.parse().ntHeaders().optionalHeader().dataDirectories().size() ==
-            16);
+    require(f.parse().ntHeaders().optionalHeader().dataDirectories().size() == 16);
     f.put(f.directoryCountOffset(), 1);
     f.setDirectory(1, 0xffffffff, 40);  // Undeclared directory is ignored.
     require(f.parse().imports().empty());
@@ -345,16 +311,13 @@ void importTables() {
             Fixture f(is64);
             f.imports(fallback);
             if (!fallback)
-                f.putRva(0x1240, is64 ? Q_UINT64_C(0x7fff12345678) : 0x76543210,
-                         is64 ? 8 : 4);
+                f.putRva(0x1240, is64 ? Q_UINT64_C(0x7fff12345678) : 0x76543210, is64 ? 8 : 4);
             const auto& pe = f.parse();
             require(pe.imports().size() == 1);
             const auto& module = pe.imports()[0];
             require(module.dllName() == QStringLiteral("KERNEL32.dll"));
-            require(module.originalFirstThunk() ==
-                    quint32(fallback ? 0 : 0x1200));
-            require(module.firstThunk() == 0x1240 &&
-                    module.timeDateStamp() == 123 &&
+            require(module.originalFirstThunk() == quint32(fallback ? 0 : 0x1200));
+            require(module.firstThunk() == 0x1240 && module.timeDateStamp() == 123 &&
                     module.forwarderChain() == 0xffffffff);
             require(module.entries().size() == 2);
             const auto& byName = module.entries()[0];
@@ -364,11 +327,8 @@ void importTables() {
             require(byName.hint() == 7 && byName.iatRva() == 0x1240 &&
                     byName.lookupValue() == 0x1280);
             require(byName.iatValue() ==
-                    (fallback
-                         ? 0x1280
-                         : (is64 ? Q_UINT64_C(0x7fff12345678) : 0x76543210)));
-            require(byOrdinal.kind() == ImportEntry::Kind::Ordinal &&
-                    byOrdinal.ordinal() == 0x42);
+                    (fallback ? 0x1280 : (is64 ? Q_UINT64_C(0x7fff12345678) : 0x76543210)));
+            require(byOrdinal.kind() == ImportEntry::Kind::Ordinal && byOrdinal.ordinal() == 0x42);
             require(byOrdinal.iatRva() == quint32(is64 ? 0x1248 : 0x1244));
         }
 }
@@ -405,15 +365,12 @@ void exportTables() {
         const auto* alias = exports.findByName(QStringLiteral("Alias"));
         const auto* forward = exports.findByName(QStringLiteral("Alpha"));
         require(normal && normal == alias && normal->ordinal() == 0x10000);
-        require(normal->kind() == ExportEntry::Kind::Function &&
-                normal->rva() == 0x10f0);
+        require(normal->kind() == ExportEntry::Kind::Function && normal->rva() == 0x10f0);
         require(forward && forward->ordinal() == 0x10002 &&
                 forward->kind() == ExportEntry::Kind::Forwarder);
         require(forward->forwarder() == QStringLiteral("OTHER.Target"));
-        require(exports.findByOrdinal(0x10003)->rva() == 0x2100 &&
-                !pe.rvaToFileOffset(0x2100));
-        require(!exports.findByOrdinal(0xffff) &&
-                !exports.findByOrdinal(0x10001) &&
+        require(exports.findByOrdinal(0x10003)->rva() == 0x2100 && !pe.rvaToFileOffset(0x2100));
+        require(!exports.findByOrdinal(0xffff) && !exports.findByOrdinal(0x10001) &&
                 !exports.findByOrdinal(0x10004));
         require(!exports.findByName(QStringLiteral("missing")));
         require(exports.entries()[1].kind() == ExportEntry::Kind::Empty);
@@ -592,31 +549,26 @@ void crossSectionReads() {
     auto stringFixture = f;
     stringFixture.putRva(0x1100, 0x1200);
     stringFixture.putRva(0x110c, 0x17fe);
-    std::memcpy(stringFixture.bytes.data() + stringFixture.foa(0x17fe), "AB",
-                2);
+    std::memcpy(stringFixture.bytes.data() + stringFixture.foa(0x17fe), "AB", 2);
     stringFixture.text(0x1200, "CD.dll");
-    require(stringFixture.parse().imports()[0].dllName() ==
-            QStringLiteral("ABCD.dll"));
+    require(stringFixture.parse().imports()[0].dllName() == QStringLiteral("ABCD.dll"));
     // The one-entry lookup requires a one-entry IAT as well.
     f.putRva(0x1244, 0);
     const auto& pe = f.parse();
     require(pe.imports()[0].entries().size() == 1);
-    require(pe.imports()[0].entries()[0].name() ==
-            QStringLiteral("ExitProcess"));
+    require(pe.imports()[0].entries()[0].name() == QStringLiteral("ExitProcess"));
     require(pe.rvaToFileOffset(0x1800) == 0x1200);
     // Place descriptors across the boundary, too: the null descriptor follows
     // in the second section, and is still bounded by the directory's RVA size.
     auto descriptors = stringFixture;
     const auto table = descriptors.bytes.mid(descriptors.foa(0x1100), 40);
     descriptors.setDirectory(1, 0x17f6, 40);
-    std::memcpy(descriptors.bytes.data() + descriptors.foa(0x17f6),
-                table.constData(), 10);
+    std::memcpy(descriptors.bytes.data() + descriptors.foa(0x17f6), table.constData(), 10);
     std::memcpy(descriptors.bytes.data() + 0x1200, table.constData() + 10, 30);
     descriptors.put(descriptors.foa(0x17f6) + 0, 0x1200);
     // Restore a DLL name outside the descriptor storage.
     descriptors.put(0x1200 + 2, 0x11c0);
-    require(descriptors.parse().imports()[0].dllName() ==
-            QStringLiteral("KERNEL32.dll"));
+    require(descriptors.parse().imports()[0].dllName() == QStringLiteral("KERNEL32.dll"));
 }
 
 void countLimits() {
@@ -636,8 +588,7 @@ void countLimits() {
     imports.put(imports.sectionOffset() + 16, 0x6fe00);
     imports.put(Fixture::Optional + 56, 0x71000);
     imports.imports(true);
-    for (int i = 0; i <= 100000; ++i)
-        imports.put(imports.foa(0x1240) + i * 4, 0x80000001);
+    for (int i = 0; i <= 100000; ++i) imports.put(imports.foa(0x1240) + i * 4, 0x80000001);
     expectFailure([&] { return PeFile{ArraySource(imports.bytes)}.parse(); });
 }
 
@@ -659,8 +610,7 @@ void fileSourceIntegration() {
         pe->parse();
     }
     // Reading parsed results and destruction do not access the borrowed source.
-    require(pe->isPe32Plus() && pe->imports().size() == 1 &&
-            pe->exports()->entries().size() == 4);
+    require(pe->isPe32Plus() && pe->imports().size() == 1 && pe->exports()->entries().size() == 4);
 }
 
 void readFailuresThrow() {
@@ -695,8 +645,7 @@ void readFailuresThrow() {
                                f.foa(0x14c0)};
         for (int offset : offsets)
             expectFailure<PeDataSourceError>([&] {
-                return PeFile{ArraySource(f.bytes, true, false,
-                                          static_cast<quint64>(offset))}
+                return PeFile{ArraySource(f.bytes, true, false, static_cast<quint64>(offset))}
                     .parse();
             });
     }
@@ -716,8 +665,7 @@ void componentParsers() {
         FileHeader coff;
         coff.parse(source, Fixture::Coff);
         require(coff.numberOfSections() == 1);
-        const quint16 size =
-            file.ntHeaders().fileHeader().sizeOfOptionalHeader();
+        const quint16 size = file.ntHeaders().fileHeader().sizeOfOptionalHeader();
         OptionalHeader optional;
         optional.parse(source, Fixture::Optional, size);
         require(optional.isPe32Plus() == is64);
@@ -728,41 +676,31 @@ void componentParsers() {
         section.parse(source, f.sectionOffset());
         require(section.name() == QStringLiteral(".test"));
         Sections sections;
-        sections.parse(source, f.sectionOffset(), 1,
-                       file.ntHeaders().optionalHeader());
+        sections.parse(source, f.sectionOffset(), 1, file.ntHeaders().optionalHeader());
         require(sections.items().size() == 1 &&
-                sections.items()[0] ==
-                    sections.findByName(QStringLiteral(".test")));
+                sections.items()[0] == sections.findByName(QStringLiteral(".test")));
         Imports imports;
         imports.parse(source, file);
-        require(imports.modules().size() == 1 &&
-                imports.modules().front().entries().size() == 2);
+        require(imports.modules().size() == 1 && imports.modules().front().entries().size() == 2);
         Exports exports;
         exports.parse(source, file);
         require(exports.isPresent() && exports.entries().size() == 4);
         expectFailure<PeDataSourceError>([&] { dos.parse(unreadable); });
-        expectFailure<PeDataSourceError>(
-            [&] { coff.parse(unreadable, Fixture::Coff); });
+        expectFailure<PeDataSourceError>([&] { coff.parse(unreadable, Fixture::Coff); });
         expectFailure<PeDataSourceError>(
             [&] { optional.parse(unreadable, Fixture::Optional, size); });
-        expectFailure<PeDataSourceError>(
-            [&] { nt.parse(unreadable, Fixture::Nt); });
-        expectFailure<PeDataSourceError>(
-            [&] { section.parse(unreadable, f.sectionOffset()); });
+        expectFailure<PeDataSourceError>([&] { nt.parse(unreadable, Fixture::Nt); });
+        expectFailure<PeDataSourceError>([&] { section.parse(unreadable, f.sectionOffset()); });
         expectFailure<PeDataSourceError>([&] {
-            sections.parse(unreadable, f.sectionOffset(), 1,
-                           file.ntHeaders().optionalHeader());
+            sections.parse(unreadable, f.sectionOffset(), 1, file.ntHeaders().optionalHeader());
         });
-        expectFailure<PeDataSourceError>(
-            [&] { imports.parse(unreadable, file); });
-        expectFailure<PeDataSourceError>(
-            [&] { exports.parse(unreadable, file); });
-        require(dos.magic() == IMAGE_DOS_SIGNATURE &&
-                coff.numberOfSections() == 1 && optional.isPe32Plus() == is64 &&
-                nt.optionalHeader().isPe32Plus() == is64 &&
-                section.name() == QStringLiteral(".test") &&
-                sections.items().size() == 1 && imports.modules().size() == 1 &&
-                exports.isPresent() && exports.entries().size() == 4);
+        expectFailure<PeDataSourceError>([&] { imports.parse(unreadable, file); });
+        expectFailure<PeDataSourceError>([&] { exports.parse(unreadable, file); });
+        require(dos.magic() == IMAGE_DOS_SIGNATURE && coff.numberOfSections() == 1 &&
+                optional.isPe32Plus() == is64 && nt.optionalHeader().isPe32Plus() == is64 &&
+                section.name() == QStringLiteral(".test") && sections.items().size() == 1 &&
+                imports.modules().size() == 1 && exports.isPresent() &&
+                exports.entries().size() == 4);
 
         // Reusing objects for a file with absent directories clears old data.
         Fixture absent(is64);
@@ -770,17 +708,15 @@ void componentParsers() {
         const auto& absentFile = absent.parse();
         imports.parse(absentSource, absentFile);
         exports.parse(absentSource, absentFile);
-        require(imports.modules().empty() && !exports.isPresent() &&
-                exports.dllName().isEmpty() && exports.entries().empty() &&
-                exports.findByOrdinal(0x10000) == nullptr);
+        require(imports.modules().empty() && !exports.isPresent() && exports.dllName().isEmpty() &&
+                exports.entries().empty() && exports.findByOrdinal(0x10000) == nullptr);
     }
 }
 
 void exceptionDetails() {
     using Code = ParseError::Code;
     Fixture f;
-    auto error =
-        captureError([&] { PeFile{ArraySource(f.bytes, false)}.parse(); });
+    auto error = captureError([&] { PeFile{ArraySource(f.bytes, false)}.parse(); });
     require(error.code() == Code::UnsupportedLayout && !error.directoryIndex());
     auto bad = f;
     bad.put(0, 0, 2);
@@ -789,13 +725,11 @@ void exceptionDetails() {
     bad = f;
     bad.put(Fixture::Nt, 0);
     error = captureError([&] { bad.parse(); });
-    require(error.code() == Code::InvalidSignature &&
-            error.offset() == Fixture::Nt);
+    require(error.code() == Code::InvalidSignature && error.offset() == Fixture::Nt);
     bad = f;
     bad.put(Fixture::Optional, 0x107, 2);
     error = captureError([&] { bad.parse(); });
-    require(error.code() == Code::UnsupportedFormat &&
-            error.offset() == Fixture::Optional);
+    require(error.code() == Code::UnsupportedFormat && error.offset() == Fixture::Optional);
     error = captureError([] { PeFile{ArraySource(QByteArray())}.parse(); });
     require(error.code() == Code::TruncatedData && error.offset() == 0);
 
@@ -804,30 +738,24 @@ void exceptionDetails() {
     bad = f;
     bad.setDirectory(1, 0x1100, 20);
     error = captureError([&] { bad.parse(); });
-    require(error.code() == Code::InvalidDirectory &&
-            error.offset() == quint64(f.foa(0x1100)) &&
+    require(error.code() == Code::InvalidDirectory && error.offset() == quint64(f.foa(0x1100)) &&
             !error.directoryIndex());
     bad = f;
     bad.putRva(0x1640, 4, 2);
     error = captureError([&] { bad.parse(); });
-    require(error.code() == Code::InvalidDirectory &&
-            error.offset() == quint64(f.foa(0x1640)) &&
+    require(error.code() == Code::InvalidDirectory && error.offset() == quint64(f.foa(0x1640)) &&
             !error.directoryIndex());
     bad = f;
     bad.setDirectory(1, 0x1100, 0);
     error = captureError([&] { bad.parse(); });
-    require(error.code() == Code::InvalidDirectory &&
-            error.directoryIndex() == 1);
-    for (int offset : {0, Fixture::Optional + 72, f.sectionOffset(),
-                       f.foa(0x1200), f.foa(0x1600)}) {
-        const auto sourceError = captureError<PeDataSourceError>([&] {
-            return PeFile{ArraySource(f.bytes, true, false, quint64(offset))}
-                .parse();
-        });
+    require(error.code() == Code::InvalidDirectory && error.directoryIndex() == 1);
+    for (int offset :
+         {0, Fixture::Optional + 72, f.sectionOffset(), f.foa(0x1200), f.foa(0x1600)}) {
+        const auto sourceError = captureError<PeDataSourceError>(
+            [&] { return PeFile{ArraySource(f.bytes, true, false, quint64(offset))}.parse(); });
         require(sourceError.code() == PeDataSourceError::Code::Io);
         require(sourceError.offset() == quint64(offset));
-        require(sourceError.length() > 0 &&
-                std::strlen(sourceError.what()) > 0);
+        require(sourceError.length() > 0 && std::strlen(sourceError.what()) > 0);
     }
 }
 
@@ -849,10 +777,8 @@ void ownershipCleanup() {
         file->parse();
         require(file->dosHeader().magic() == 0x5a4d);
         require(file->ntHeaders().fileHeader().numberOfSections() == 1);
-        require(file->sections().items()[0] ==
-                file->sections().findByRva(0x1000));
-        require(file->imports().size() == 1 &&
-                file->exports()->entries().size() == 4);
+        require(file->sections().items()[0] == file->sections().findByRva(0x1000));
+        require(file->imports().size() == 1 && file->exports()->entries().size() == 4);
         const auto* oldNt = &file->ntHeaders();
         const auto* oldSections = &file->sections();
         const auto* oldExports = file->exports();
@@ -872,26 +798,20 @@ void ownershipCleanup() {
             source = exportFailure;
             file->parse();
         });
-        require(&file->ntHeaders() == oldNt &&
-                &file->sections() == oldSections &&
+        require(&file->ntHeaders() == oldNt && &file->sections() == oldSections &&
                 file->exports() == oldExports && file->isPe32Plus() &&
-                file->imports().size() == 1 &&
-                file->exports()->entries().size() == 4);
+                file->imports().size() == 1 && file->exports()->entries().size() == 4);
         source = ArraySource(f.bytes);
         file->parse();
         Fixture absent;
         source = ArraySource(absent.bytes);
         file->parse();
-        require(!file->isPe32Plus() && file->imports().empty() &&
-                file->exports() == nullptr);
+        require(!file->isPe32Plus() && file->imports().empty() && file->exports() == nullptr);
         delete file;
-        expectFailure<PeDataSourceError>(
-            [&] { return PeFile{headerFailure}.parse(); });
+        expectFailure<PeDataSourceError>([&] { return PeFile{headerFailure}.parse(); });
         expectFailure([&] { return PeFile{sectionFailure}.parse(); });
-        expectFailure<PeDataSourceError>(
-            [&] { return PeFile{importFailure}.parse(); });
-        expectFailure<PeDataSourceError>(
-            [&] { return PeFile{exportFailure}.parse(); });
+        expectFailure<PeDataSourceError>([&] { return PeFile{importFailure}.parse(); });
+        expectFailure<PeDataSourceError>([&] { return PeFile{exportFailure}.parse(); });
     };
     cycle();  // Initialize any runtime caches before checking allocations.
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -902,8 +822,7 @@ void ownershipCleanup() {
 #if defined(_MSC_VER) && defined(_DEBUG)
     _CrtMemCheckpoint(&after);
     _CrtMemDifference(&difference, &before, &after);
-    require(difference.lCounts[_NORMAL_BLOCK] == 0 &&
-                difference.lSizes[_NORMAL_BLOCK] == 0,
+    require(difference.lCounts[_NORMAL_BLOCK] == 0 && difference.lSizes[_NORMAL_BLOCK] == 0,
             "Parsed objects leaked after deletion or an exception");
 #endif
 }
@@ -945,9 +864,8 @@ int main(int argc, char** argv) {
             std::printf(
                 "PASS: %s: PE%s, %zu sections, %zu import modules, %zu "
                 "exports\n",
-                argv[i], pe->isPe32Plus() ? "32+" : "32",
-                pe->sections().items().size(), pe->imports().size(),
-                pe->exports() ? pe->exports()->entries().size() : 0);
+                argv[i], pe->isPe32Plus() ? "32+" : "32", pe->sections().items().size(),
+                pe->imports().size(), pe->exports() ? pe->exports()->entries().size() : 0);
             delete pe;
         } catch (const std::exception& error) {
             delete pe;

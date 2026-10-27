@@ -17,19 +17,16 @@ PeFile::~PeFile() {
 void PeFile::parse() {
     const auto& source = m_source;
     if (!source.isFileAligned())
-        throw ParseError(
-            ParseError::Code::UnsupportedLayout,
-            QStringLiteral("PeFile::parse requires file-layout PE data"));
+        throw ParseError(ParseError::Code::UnsupportedLayout,
+                         QStringLiteral("PeFile::parse requires file-layout PE data"));
     PeFile file(source);
     file.m_dos = new DosHeader;
     file.m_dos->parse(source);
     file.m_nt = new NtHeaders;
     file.m_nt->parse(source, file.m_dos->ntHeadersOffset());
     file.m_sections = new Sections;
-    file.m_sections->parse(
-        source, file.m_dos->ntHeadersOffset() + file.m_nt->totalSize(),
-        file.m_nt->fileHeader().numberOfSections(),
-        file.m_nt->optionalHeader());
+    file.m_sections->parse(source, file.m_dos->ntHeadersOffset() + file.m_nt->totalSize(),
+                           file.m_nt->fileHeader().numberOfSections(), file.m_nt->optionalHeader());
     quint64 stringBytes = 0;
     file.m_imports = new Imports;
     file.m_imports->parse(source, file, stringBytes);
