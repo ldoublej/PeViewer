@@ -1,5 +1,6 @@
 #include "PeDataSource.h"
 
+#include <cstring>
 #include <limits>
 
 PeDataSourceError::PeDataSourceError(Code code, const QString& message, quint64 offset,
@@ -9,28 +10,11 @@ PeDataSourceError::PeDataSourceError(Code code, const QString& message, quint64 
       m_offset(offset),
       m_length(length) {}
 
-namespace {
-template <typename T>
-T readLittleEndian(const PeDataSource& source, quint64 offset) {
-    const auto bytes = source.readBytes(offset, sizeof(T));
-    T value = 0;
-    for (int i = 0; i < bytes.size(); ++i)
-        value |= static_cast<T>(static_cast<quint8>(bytes[i])) << (i * 8);
-    return value;
-}
-}  // namespace
+quint16 PeDataSource::readU16(quint64 offset) const { return readStruct<quint16>(offset); }
 
-quint16 PeDataSource::readU16(quint64 offset) const {
-    return readLittleEndian<quint16>(*this, offset);
-}
+quint32 PeDataSource::readU32(quint64 offset) const { return readStruct<quint32>(offset); }
 
-quint32 PeDataSource::readU32(quint64 offset) const {
-    return readLittleEndian<quint32>(*this, offset);
-}
-
-quint64 PeDataSource::readU64(quint64 offset) const {
-    return readLittleEndian<quint64>(*this, offset);
-}
+quint64 PeDataSource::readU64(quint64 offset) const { return readStruct<quint64>(offset); }
 
 QByteArray PeDataSource::readBytes(quint64 offset, std::size_t count) const {
     if (count > static_cast<std::size_t>(std::numeric_limits<int>::max()))
@@ -56,13 +40,13 @@ QString PeDataSource::readUtf16(quint64 offset, std::size_t maxCodeUnits) const 
     QString text;
     text.reserve(static_cast<int>(maxCodeUnits));
     for (int i = 0; i < bytes.size(); i += 2) {
-        const auto unit = static_cast<quint16>(static_cast<quint8>(bytes[i])) |
-                          (static_cast<quint16>(static_cast<quint8>(bytes[i + 1])) << 8);
+        quint16 unit;
+        std::memcpy(&unit, bytes.constData() + i, sizeof(unit));
         if (unit == 0) break;
         if (QChar::isHighSurrogate(unit)) {
             if (i + 3 < bytes.size()) {
-                const auto next = static_cast<quint16>(static_cast<quint8>(bytes[i + 2])) |
-                                  (static_cast<quint16>(static_cast<quint8>(bytes[i + 3])) << 8);
+                quint16 next;
+                std::memcpy(&next, bytes.constData() + i + 2, sizeof(next));
                 if (QChar::isLowSurrogate(next)) {
                     text.append(QChar(unit));
                     text.append(QChar(next));

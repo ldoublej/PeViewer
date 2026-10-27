@@ -30,25 +30,18 @@ QString readCString(const PeDataSource& source, const PeFile& file, quint32 rva,
 std::optional<IMAGE_DATA_DIRECTORY> directory(const PeFile& file, int index);
 
 template <typename T>
-T decodeLittleEndian(const QByteArray& bytes) {
-    static_assert(std::is_integral<T>::value && sizeof(T) <= 8, "PE scalar required");
-    using U = typename std::make_unsigned<T>::type;
-    quint64 value = 0;
-    for (std::size_t i = 0; i < sizeof(T); ++i)
-        value |= quint64(static_cast<quint8>(bytes[static_cast<int>(i)])) << (i * 8);
-    const U bits = static_cast<U>(value);
-    T result{};
-    std::memcpy(&result, &bits, sizeof(T));
-    return result;
-}
-
-template <typename T>
 T readScalar(const PeDataSource& source, quint64 offset) {
-    return decodeLittleEndian<T>(readBytes(source, offset, sizeof(T)));
+    static_assert(std::is_integral<T>::value && sizeof(T) <= 8, "PE scalar required");
+    checkRange(source, offset, sizeof(T));
+    return source.readStruct<T>(offset);
 }
 
 template <typename T>
 T readAtRva(const PeDataSource& source, const PeFile& file, quint32 rva) {
-    return decodeLittleEndian<T>(readBytesAtRva(source, file, rva, sizeof(T)));
+    static_assert(std::is_integral<T>::value && sizeof(T) <= 8, "PE scalar required");
+    const auto bytes = readBytesAtRva(source, file, rva, sizeof(T));
+    T result;
+    std::memcpy(&result, bytes.constData(), sizeof(result));
+    return result;
 }
 }  // namespace PeParseDetail

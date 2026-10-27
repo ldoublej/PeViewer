@@ -9,6 +9,8 @@
 #include <stdexcept>
 #include <type_traits>
 
+static_assert(Q_BYTE_ORDER == Q_LITTLE_ENDIAN, "Only little-endian platforms are supported");
+
 class PeDataSourceError : public std::runtime_error {
 public:
     enum class Code : std::int8_t { OutOfBounds, Io };
@@ -46,7 +48,7 @@ public:
     QString readUtf16(quint64 offset, std::size_t maxCodeUnits) const;
 
     // T 须为紧凑布局的 PE 结构体，且所有字段均能接受任意字节值。
-    // 整数字段按主机字节序解释；跨平台读取标量时应使用 readU*。
+    // 仅支持小端平台，直接读取本机布局，不执行字节序转换。
     template <typename T>
     T readStruct(quint64 offset) const {
         static_assert(std::is_trivially_copyable<T>::value && std::is_standard_layout<T>::value,

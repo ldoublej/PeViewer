@@ -14,12 +14,13 @@ ROM、NE、COFF 对象等不支持的格式均解析失败，抛出 `ParseError`
 `NtHeaders::parse()` 实现；节和节表由 `Section::parse()`、`Sections::parse()`
 实现；导入表由 `Imports::parse()` 实现，导出表由 `Exports::parse()` 实现。
 各部分的解析代码分别位于 `Headers.cpp`、`Sections.cpp`、`Imports.cpp`、
-`Exports.cpp`。内部共享函数只处理小端读取、边界检查、RVA 定位和有界字符串读取，
+`Exports.cpp`。内部共享函数只处理直接读取、边界检查、RVA 定位和有界字符串读取，
 不保存数据源或镜像状态。
 
 ## 使用
 
-使用 C++17，链接 CMake 目标 `PeParse`，公共依赖为 `Qt::Core`、`PeDataSource`、`PeStructs`。
+使用 C++17，仅支持小端平台。链接 CMake 目标 `PeParse`，公共依赖为 `Qt::Core`、
+`PeDataSource`、`PeStructs`。
 
 ```cpp
 #include <PeFileDataSource.h>
@@ -92,7 +93,7 @@ try {
 - 导出项区分普通函数、转发项和空 EAT 槽位，支持别名和仅按序号导出。
   转发项保留字符串（例如 `OTHER.Target` 或 `OTHER.#123`），不解析目标模块。
   空槽保留在 `entries()` 中，但名称/序号查询不会返回空槽。
-- PE32+ 的 `baseOfData()` 返回空值。所有数值按小端字段逐项解码，
+- PE32+ 的 `baseOfData()` 返回空值。数值直接按本机小端布局读取，不执行字节序转换，
   镜像类型取决于文件的 Magic，与宿主指针位数无关。
 - 标准数据目录最多暴露 16 项，同时受 `NumberOfRvaAndSizes` 和可选头声明长度约束。
   声明数量超过 16 时保留原始数量，仅解释前 16 项。目录字段按原始 PE 语义保留，

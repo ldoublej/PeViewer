@@ -154,9 +154,10 @@ struct Fixture {
         return rva < 0x200 ? static_cast<int>(rva) : static_cast<int>(rva - 0x1000 + 0x200);
     }
     void put(int offset, quint64 value, int width = 4) {
-        require(offset >= 0 && offset + width <= bytes.size(), "fixture write out of range");
-        for (int i = 0; i < width; ++i)
-            bytes[offset + i] = static_cast<char>((value >> (i * 8)) & 0xff);
+        require(width >= 0 && width <= static_cast<int>(sizeof(value)) && offset >= 0 &&
+                    offset + width <= bytes.size(),
+                "fixture write out of range");
+        std::memcpy(bytes.data() + offset, &value, static_cast<std::size_t>(width));
     }
     void putRva(quint32 rva, quint64 value, int width = 4) { put(foa(rva), value, width); }
     void text(int offset, const char* value) {

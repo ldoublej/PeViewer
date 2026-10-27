@@ -72,7 +72,7 @@ using namespace PeParseDetail;
 namespace {
 using Code = ParseError::Code;
 bool isPowerOfTwo(quint32 value) { return value != 0 && (value & (value - 1)) == 0; }
-// Decode PE fields explicitly, independent of the host byte order.
+// Read PE fields directly using the native little-endian layout.
 #define PE_READ_VALUE(target, expression) target = (expression)
 
 #define PE_READ(type, object, field, base) \

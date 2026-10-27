@@ -38,8 +38,8 @@ Windows 也可以选择独立定义（这时不要再包含 Windows SDK 头文�
 `.tPolicy` 的导出宏在 GCC/Clang 下适配 section 属性和聚合存储，
 导出符号仍为 `__ImagePolicyMetadata`，其声明类型仍为 `IMAGE_POLICY_METADATA`。
 
-PE 文件字段遵循[微软 PE/COFF 规范](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format)的小端编码。当前验证覆盖小端 x86、x64 和 ARM64；在大端宿主上，
-直接将文件字节读进这些结构不会自动转换字段或位域的字节序。
+PE 文件字段遵循[微软 PE/COFF 规范](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format)的小端编码。
+本项目仅支持小端平台，文件字节直接按对应结构布局读取，不执行字节序转换。
 
 ## 校验
 

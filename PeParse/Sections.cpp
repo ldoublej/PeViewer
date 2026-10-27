@@ -37,7 +37,7 @@ using namespace PeParseDetail;
 namespace {
 using Code = ParseError::Code;
 }
-// Decode PE fields explicitly, independent of the host byte order.
+// Read PE fields directly using the native little-endian layout.
 #define PE_READ_VALUE(target, expression) target = (expression)
 
 #define PE_READ(type, object, field, base) \
