@@ -7,6 +7,12 @@ add_executable(PeParseTests pe_parse_tests.cpp)
 target_link_libraries(PeParseTests PRIVATE parse)
 add_test(NAME PeParseTests COMMAND PeParseTests)
 
+foreach(test IN ITEMS api_set module_searcher dependencies_tree)
+    add_executable(${test}_tests ${test}_tests.cpp)
+    target_link_libraries(${test}_tests PRIVATE dependencies)
+    add_test(NAME ${test}_tests COMMAND ${test}_tests)
+endforeach()
+
 add_executable(PeViewerUiTests
     pe_viewer_ui_tests.cpp
     ../src/peviewer/pe_viewer.cpp

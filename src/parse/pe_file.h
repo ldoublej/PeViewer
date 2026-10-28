@@ -19,6 +19,9 @@ public:
     void parse();
     ~PeFile();
 
+    bool isParsed() const noexcept { return m_nt != nullptr; }
+    const PeDataSource& dataSource() const { return m_source; }
+
     // All returned references and pointers are borrowed from this PeFile.
     const DosHeader& dosHeader() const { return *m_dos; }
     const NtHeaders& ntHeaders() const { return *m_nt; }

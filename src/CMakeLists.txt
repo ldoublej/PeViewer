@@ -1,5 +1,6 @@
 add_subdirectory("pestructs")
 add_subdirectory("datasource")
 add_subdirectory("parse")
+add_subdirectory("dependencies")
 add_subdirectory("workspace")
 add_subdirectory("peviewer")

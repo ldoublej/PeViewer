@@ -11,7 +11,7 @@ Checks: >-
   modernize-use-equals-default,
   readability-duplicate-include
 WarningsAsErrors: ''
-HeaderFilterRegex: '(^|[/\\])(datasource|parse|workspace|peviewer|tests)[/\\]'
+HeaderFilterRegex: '(^|[/\\])(datasource|parse|dependencies|workspace|peviewer|tests)[/\\]'
 ExcludeHeaderFilterRegex: '(^|[/\\])(out|build|pestructs)[/\\]|[/\\][^/\\]*_autogen[/\\]'
 SystemHeaders: false
 FormatStyle: file
