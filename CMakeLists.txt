@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project("PeViewer")
+project("peviewer")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,13 +23,9 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
     Widgets
     LinguistTools
 )
-add_subdirectory("PeStructs")
-add_subdirectory("PeDataSource")
-add_subdirectory("PeParse")
-add_subdirectory("WorkspaceManager")
-add_subdirectory("PeViewer")
+add_subdirectory("src")
 
 if(BUILD_TESTING)
     include(CTest)
-    add_subdirectory("Tests")
+    add_subdirectory("tests")
 endif()
