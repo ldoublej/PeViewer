@@ -1,3 +1,10 @@
 #include "workspace_manager.h"
 
-WorkspaceManager::WorkspaceManager() = default;
+WorkspaceManager& WorkspaceManager::instance() {
+    static WorkspaceManager manager;
+    return manager;
+}
+
+WorkspaceManager::WorkspaceManager(){
+    
+}
