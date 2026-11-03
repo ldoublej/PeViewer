@@ -9,7 +9,7 @@
 using namespace DependencyTests;
 
 namespace {
-const DependencyEdge& dependency(const DependencyModule& module, const QString& name) {
+const DependencyEdge& dependency(const ModuleNode& module, const QString& name) {
     for (const auto& entry : module.dependencies()) {
         if (entry.dllName == name) {
             return entry;
@@ -18,7 +18,7 @@ const DependencyEdge& dependency(const DependencyModule& module, const QString& 
     throw std::runtime_error("Dependency edge was not recorded");
 }
 
-const DependencyModule& resolved(const DependencyModule& module, const QString& name) {
+const ModuleNode& resolved(const ModuleNode& module, const QString& name) {
     const auto& entry = dependency(module, name);
     require(entry.isResolved() && !entry.error, "Expected resolved dependency");
     return *entry.module;
@@ -51,9 +51,9 @@ void fileGraph() {
             "Shared dependency was duplicated");
     require(&resolved(a, QStringLiteral("APP.EXE")) == rootNode, "Root cycle did not reuse root");
     require(&resolved(shared, QStringLiteral("a.dll")) == &a, "Child cycle was not merged");
-    require(shared.dependents() == std::vector<const DependencyModule*>{&a, &b},
+    require(shared.dependents() == std::vector<const ModuleNode*>{&a, &b},
             "Reverse edges are incorrect");
-    require(a.dependents() == std::vector<const DependencyModule*>{rootNode, &shared},
+    require(a.dependents() == std::vector<const ModuleNode*>{rootNode, &shared},
             "Cycle reverse edges are incorrect");
     require(graph.moduleCount() == 4, "Unexpected module count");
     const auto& edges = graph.root().dependencies();

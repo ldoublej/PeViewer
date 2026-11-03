@@ -12,7 +12,7 @@
 
 #include "file_module_searcher.h"
 
-class DependencyModule;
+class ModuleNode;
 
 struct DependencyError {
     enum class Code : std::int8_t { NotFound, ReadError, ParseError, ArchitectureMismatch };
@@ -26,7 +26,7 @@ struct DependencyError {
 
 struct DependencyEdge {
     QString dllName;
-    const DependencyModule* module = nullptr;
+    const ModuleNode* module = nullptr;
     // Present exactly when module is null. A bad edge does not stop other modules.
     std::optional<DependencyError> error;
     bool isResolved() const { return module != nullptr; }
@@ -34,24 +34,24 @@ struct DependencyEdge {
 
 // The graph owns nodes. References/pointers are borrowed; rebuilding invalidates
 // all child nodes and edges, while the root node remains at the same address.
-class DependencyModule {
+class ModuleNode {
 public:
     const QString& identity() const { return m_identity; }
     const PeFile& file() const { return *m_file; }
     const std::vector<DependencyEdge>& dependencies() const { return m_dependencies; }
-    const std::vector<const DependencyModule*>& dependents() const { return m_dependents; }
+    const std::vector<const ModuleNode*>& dependents() const { return m_dependents; }
 
 private:
     friend class DependencyGraph;
-    DependencyModule(QString identity, const PeFile& borrowed);
-    explicit DependencyModule(ResolvedModule resolved);
+    ModuleNode(QString identity, const PeFile& borrowed);
+    explicit ModuleNode(ResolvedModule resolved);
     QString m_identity;
     // Destruction order keeps the source alive until after its PeFile is destroyed.
     std::unique_ptr<PeDataSource> m_source;
     std::unique_ptr<PeFile> m_ownedFile;
     const PeFile* m_file = nullptr;
     std::vector<DependencyEdge> m_dependencies;
-    std::vector<const DependencyModule*> m_dependents;
+    std::vector<const ModuleNode*> m_dependents;
 };
 
 class DependencyGraph {
@@ -64,17 +64,17 @@ public:
     DependencyGraph(const PeFile& root, QString rootIdentity,
                     std::unique_ptr<ModuleSearcher> searcher);
     void build();
-    const DependencyModule& root() const { return *m_modules.front(); }
+    const ModuleNode& root() const { return *m_modules.front(); }
     std::size_t moduleCount() const { return m_modules.size(); }
 
 private:
     Q_DISABLE_COPY_MOVE(DependencyGraph)
     struct Resolution {
-        DependencyModule* module = nullptr;
+        ModuleNode* module = nullptr;
         std::optional<DependencyError> error;
     };
     Resolution resolve(const QString& name);
     std::unique_ptr<ModuleSearcher> m_searcher;
-    std::vector<std::unique_ptr<DependencyModule>> m_modules;
+    std::vector<std::unique_ptr<ModuleNode>> m_modules;
     QHash<QString, Resolution> m_resolutions;
 };

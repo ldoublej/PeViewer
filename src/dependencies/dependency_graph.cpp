@@ -21,10 +21,10 @@ DependencyError currentError(DependencyError::Code code, const std::exception& e
 }
 }  // namespace
 
-DependencyModule::DependencyModule(QString identity, const PeFile& borrowed)
+ModuleNode::ModuleNode(QString identity, const PeFile& borrowed)
     : m_identity(std::move(identity)), m_file(&borrowed) {}
 
-DependencyModule::DependencyModule(ResolvedModule resolved)
+ModuleNode::ModuleNode(ResolvedModule resolved)
     : m_identity(std::move(resolved.identity)),
       m_source(std::move(resolved.source)),
       m_ownedFile(std::make_unique<PeFile>(*m_source)),
@@ -44,7 +44,7 @@ DependencyGraph::DependencyGraph(const PeFile& root, QString rootIdentity,
             "DependencyGraph requires a parsed root, identity and searcher");
     }
     m_modules.push_back(
-        std::unique_ptr<DependencyModule>(new DependencyModule(std::move(rootIdentity), root)));
+        std::unique_ptr<ModuleNode>(new ModuleNode(std::move(rootIdentity), root)));
 }
 
 DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
@@ -72,7 +72,7 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
     const auto identity = found->identity;
     Resolution resolution;
     try {
-        std::unique_ptr<DependencyModule> module(new DependencyModule(std::move(*found)));
+        std::unique_ptr<ModuleNode> module(new ModuleNode(std::move(*found)));
         const bool expected = root().file().isPe32Plus();
         const bool actual = module->file().isPe32Plus();
         if (expected != actual) {
