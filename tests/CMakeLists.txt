@@ -22,6 +22,8 @@ add_executable(PeViewerUiTests
     ../src/peviewer/language_manager.h
     ../src/peviewer/components/dependency_tree_widget.cpp
     ../src/peviewer/components/dependency_tree_widget.h
+    ../src/peviewer/components/dependency_tree_view.cpp
+    ../src/peviewer/components/dependency_tree_view.h
     ../src/peviewer/components/dependency_tree_model.cpp
     ../src/peviewer/components/dependency_tree_model.h
     ../src/peviewer/components/dependency_tree_delegate.cpp

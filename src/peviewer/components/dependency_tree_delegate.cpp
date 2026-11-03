@@ -11,6 +11,18 @@
 namespace {
 using Status = DependencyTreeModel::Status;
 
+// Keeps the pill compact so it fits the slimmer rows.
+constexpr int kPillHorizontalPadding = 8;
+constexpr int kPillVerticalPadding = 2;
+constexpr int kCellHorizontalMargin = 6;
+constexpr int kRowVerticalPadding = 3;
+
+QFont pillFont(const QFont& base) {
+    QFont font(base);
+    font.setWeight(QFont::DemiBold);
+    return font;
+}
+
 QColor statusColor(Status status, bool dark) {
     switch (status) {
         case Status::Root:
@@ -26,6 +38,13 @@ QColor statusColor(Status status, bool dark) {
 }  // namespace
 
 DependencyTreeDelegate::DependencyTreeDelegate(QObject* parent) : QStyledItemDelegate(parent) {}
+
+void DependencyTreeDelegate::initStyleOption(QStyleOptionViewItem* option,
+                                             const QModelIndex& index) const {
+    QStyledItemDelegate::initStyleOption(option, index);
+    // Selection already highlights the row; skip the dotted keyboard-focus frame.
+    option->state &= ~QStyle::State_HasFocus;
+}
 
 void DependencyTreeDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                                    const QModelIndex& index) const {
@@ -47,16 +66,19 @@ void DependencyTreeDelegate::paint(QPainter* painter, const QStyleOptionViewItem
         return;
     }
 
-    const QFontMetrics metrics(opt.font);
-    const QRect area = opt.rect.adjusted(6, 3, -6, -3);
+    const QFont font = pillFont(opt.font);
+    const QFontMetrics metrics(font);
+    const QRect area = opt.rect.adjusted(kCellHorizontalMargin, kRowVerticalPadding,
+                                         -kCellHorizontalMargin, -kRowVerticalPadding);
     QString label = text;
-    const int available = qMax(0, area.width() - 20);
+    const int available = qMax(0, area.width() - 2 * kPillHorizontalPadding);
     if (metrics.horizontalAdvance(label) > available) {
         label = metrics.elidedText(label, Qt::ElideRight, available);
     }
 
-    const int height = qMin(area.height(), metrics.height() + 6);
-    const int width = qMin(area.width(), metrics.horizontalAdvance(label) + 20);
+    const int height = qMin(area.height(), metrics.height() + 2 * kPillVerticalPadding);
+    const int width =
+        qMin(area.width(), metrics.horizontalAdvance(label) + 2 * kPillHorizontalPadding);
     if (width <= 0 || height <= 0) {
         return;
     }
@@ -71,7 +93,7 @@ void DependencyTreeDelegate::paint(QPainter* painter, const QStyleOptionViewItem
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setFont(opt.font);
+    painter->setFont(font);
     painter->setPen(QPen(color, 1));
     painter->setBrush(fill);
     const qreal radius = height / 2.0;
@@ -84,13 +106,15 @@ void DependencyTreeDelegate::paint(QPainter* painter, const QStyleOptionViewItem
 QSize DependencyTreeDelegate::sizeHint(const QStyleOptionViewItem& option,
                                        const QModelIndex& index) const {
     QSize size = QStyledItemDelegate::sizeHint(option, index);
-    size.setHeight(qMax(size.height(), option.fontMetrics.height() + 12));
+    // Slim, uniform rows: just enough padding to keep text off the row edges.
+    size.setHeight(qMax(18, option.fontMetrics.height() + 2 * kRowVerticalPadding));
+
     if (index.column() == DependencyTreeModel::StatusColumn) {
-        // The painted pill adds 20px of padding, and the cell adds 12px of margin.
         QStyleOptionViewItem opt(option);
         initStyleOption(&opt, index);
-        const int textWidth = opt.fontMetrics.horizontalAdvance(opt.text);
-        size.setWidth(textWidth + 32);
+        const QFontMetrics metrics(pillFont(opt.font));
+        const int textWidth = metrics.horizontalAdvance(opt.text);
+        size.setWidth(textWidth + 2 * kPillHorizontalPadding + 2 * kCellHorizontalMargin + 2);
     }
     return size;
 }

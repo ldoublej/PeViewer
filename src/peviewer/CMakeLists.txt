@@ -11,6 +11,8 @@ set(PROJECT_SOURCES
     language_manager.cpp
     components/dependency_tree_widget.h
     components/dependency_tree_widget.cpp
+    components/dependency_tree_view.h
+    components/dependency_tree_view.cpp
     components/dependency_tree_model.h
     components/dependency_tree_model.cpp
     components/dependency_tree_delegate.h

@@ -5,7 +5,7 @@
 class DependencyGraph;
 class DependencyTreeDelegate;
 class DependencyTreeModel;
-class QTreeView;
+class DependencyTreeView;
 
 // Read-only tree view of a DependencyGraph. The graph is borrowed: keep it alive
 // while it is set, and call clear() before destroying it.
@@ -25,5 +25,5 @@ protected:
 private:
     DependencyTreeModel* m_model = nullptr;
     DependencyTreeDelegate* m_delegate = nullptr;
-    QTreeView* m_view = nullptr;
+    DependencyTreeView* m_view = nullptr;
 };
