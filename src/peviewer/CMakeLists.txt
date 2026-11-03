@@ -9,6 +9,12 @@ set(PROJECT_SOURCES
     pe_viewer.cpp
     language_manager.h
     language_manager.cpp
+    components/dependency_tree_widget.h
+    components/dependency_tree_widget.cpp
+    components/dependency_tree_model.h
+    components/dependency_tree_model.cpp
+    components/dependency_tree_delegate.h
+    components/dependency_tree_delegate.cpp
 )
 
 set(TS_FILES
@@ -48,11 +54,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 add_dependencies(${PROJECT_NAME} peviewer_translations)
 
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         parse
         workspace
         datasource
+        dependencies
     PUBLIC
         Qt::Core
         Qt::Gui

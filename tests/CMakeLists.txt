@@ -20,11 +20,17 @@ add_executable(PeViewerUiTests
     ../src/peviewer/pe_viewer.ui
     ../src/peviewer/language_manager.cpp
     ../src/peviewer/language_manager.h
+    ../src/peviewer/components/dependency_tree_widget.cpp
+    ../src/peviewer/components/dependency_tree_widget.h
+    ../src/peviewer/components/dependency_tree_model.cpp
+    ../src/peviewer/components/dependency_tree_model.h
+    ../src/peviewer/components/dependency_tree_delegate.cpp
+    ../src/peviewer/components/dependency_tree_delegate.h
     "${PROJECT_BINARY_DIR}/src/peviewer/translations.qrc"
 )
 set_target_properties(PeViewerUiTests PROPERTIES AUTORCC ON)
 target_include_directories(PeViewerUiTests PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
-target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets parse)
+target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets parse dependencies)
 add_dependencies(PeViewerUiTests peviewer_translations)
 add_test(NAME PeViewerUiTests COMMAND PeViewerUiTests)
 set_tests_properties(PeViewerUiTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
