@@ -41,7 +41,7 @@ void fileGraph() {
     root.parse();
     DependencyGraph graph(root, FileLocatorOptions{});
     const auto* rootNode = &graph.root();
-    require(&rootNode->file() == &root && rootNode->dependencies().empty(),
+    require(&rootNode->pe_file() == &root && rootNode->dependencies().empty(),
             "Root is not borrowed before build");
     graph.build();
     const auto& a = resolved(graph.root(), QStringLiteral("a.dll"));
@@ -56,6 +56,7 @@ void fileGraph() {
     require(a.dependents() == std::vector<const ModuleNode*>{rootNode, &shared},
             "Cycle reverse edges are incorrect");
     require(graph.moduleCount() == 4, "Unexpected module count");
+    require(graph.files().size() == 3, "Store did not retain parsed dependency files");
     const auto& edges = graph.root().dependencies();
     require(edges.size() == 4 && edges[0].dllName == QStringLiteral("a.dll") &&
                 edges[1].dllName == QStringLiteral("b.dll"),
@@ -70,12 +71,14 @@ void fileGraph() {
     writePe(dir, QStringLiteral("missing.dll"));
     writePe(dir, QStringLiteral("a.dll"), {QStringLiteral("missing.dll")});
     graph.build();
-    require(&graph.root() == rootNode && &graph.root().file() == &root, "Rebuild replaced the root");
+    require(&graph.root() == rootNode && &graph.root().pe_file() == &root,
+            "Rebuild replaced the root");
     const auto& missing = resolved(graph.root(), QStringLiteral("missing.dll"));
     const auto& rebuiltA = resolved(graph.root(), QStringLiteral("a.dll"));
     require(&resolved(rebuiltA, QStringLiteral("missing.dll")) == &missing,
             "Rebuild reused old results");
     require(graph.root().dependents().empty(), "Rebuild retained obsolete reverse edges");
+    require(graph.files().size() == 4, "Rebuild did not refresh the store");
     require(root.imports().size() == 4, "Graph modified borrowed root imports");
 }
 
@@ -171,8 +174,13 @@ void customSources() {
         require(rootState->reads == rootReads, "Borrowed root was parsed again");
         require(bad->reads == 1, "Failed module was parsed again through alias");
         require(graph.moduleCount() == 2 && child->alive == 1, "Child ownership is incorrect");
-        require(bad->alive == 0 && wide->alive == 0 && unreadable->alive == 0,
+        require(bad->alive == 0 && unreadable->alive == 0,
                 "Failed dependency leaked its data source");
+        require(wide->alive == 1, "Architecture mismatch was not retained by the store");
+        require(graph.files().size() == 2 && graph.files().contains(QStringLiteral("child")) &&
+                    graph.files().contains(QStringLiteral("wide")) &&
+                    graph.files().find(QStringLiteral("root")) == nullptr,
+                "Store contents do not match parsed dependencies");
         const auto& mismatch = dependency(graph.root(), QStringLiteral("wide.dll"));
         require(!mismatch.module &&
                     mismatch.error->code == DependencyError::Code::ArchitectureMismatch &&
@@ -199,7 +207,7 @@ void customSources() {
         require(rootState->reads == rootReads && rootState->alive == 1,
                 "Graph took ownership of root data source");
     }
-    require(child->alive == 0 && rootState->alive == 1,
+    require(child->alive == 0 && wide->alive == 0 && rootState->alive == 1,
             "Graph destruction violated source ownership");
 }
 

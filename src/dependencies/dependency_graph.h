@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "file_module_locator.h"
+#include "pe_file_store.h"
 
 class ModuleNode;
 
@@ -32,8 +33,9 @@ struct DependencyEdge {
     bool isResolved() const { return module != nullptr; }
 };
 
-// The graph owns nodes. References/pointers are borrowed; rebuilding invalidates
-// all child nodes and edges, while the root node remains at the same address.
+// The graph owns nodes; every node borrows its PeFile from the graph's store, or
+// from the caller in the root's case. Rebuilding invalidates all child nodes and
+// edges, while the root node remains at the same address.
 class ModuleNode {
 public:
     const QString& identity() const { return m_identity; }
@@ -44,11 +46,7 @@ public:
 private:
     friend class DependencyGraph;
     ModuleNode(QString identity, const PeFile& borrowed);
-    explicit ModuleNode(LocatedModule resolved);
     QString m_identity;
-    // Destruction order keeps the source alive until after its PeFile is destroyed.
-    std::unique_ptr<PeDataSource> m_source;
-    std::unique_ptr<PeFile> m_ownedFile;
     const PeFile* m_file = nullptr;
     std::vector<DependencyEdge> m_dependencies;
     std::vector<const ModuleNode*> m_dependents;
@@ -66,6 +64,8 @@ public:
     void build();
     const ModuleNode& root() const { return *m_modules.front(); }
     std::size_t moduleCount() const { return m_modules.size(); }
+    // Parsed dependency files created during build(); the root file is not stored.
+    const PeFileStore& files() const { return m_files; }
 
 private:
     Q_DISABLE_COPY_MOVE(DependencyGraph)
@@ -74,6 +74,8 @@ private:
         std::optional<DependencyError> error;
     };
     Resolution resolve(const QString& name);
+    // Declared before the nodes so stored files outlive every ModuleNode.
+    PeFileStore m_files;
     std::unique_ptr<ModuleLocator> m_locator;
     std::vector<std::unique_ptr<ModuleNode>> m_modules;
     QHash<QString, Resolution> m_resolutions;

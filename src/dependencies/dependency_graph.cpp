@@ -24,14 +24,6 @@ DependencyError currentError(DependencyError::Code code, const std::exception& e
 ModuleNode::ModuleNode(QString identity, const PeFile& borrowed)
     : m_identity(std::move(identity)), m_file(&borrowed) {}
 
-ModuleNode::ModuleNode(LocatedModule resolved)
-    : m_identity(std::move(resolved.identity)),
-      m_source(std::move(resolved.source)),
-      m_ownedFile(std::make_unique<PeFile>(*m_source)),
-      m_file(m_ownedFile.get()) {
-    m_ownedFile->parse();
-}
-
 DependencyGraph::DependencyGraph(const PeFile& root, FileLocatorOptions options)
     : DependencyGraph(root, FileModuleLocator::fileIdentity(root.dataSource().url()),
                       fileLocator(root, std::move(options))) {}
@@ -72,9 +64,9 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
     const auto identity = found->identity;
     Resolution resolution;
     try {
-        std::unique_ptr<ModuleNode> module(new ModuleNode(std::move(*found)));
+        const PeFile* file = m_files.load(identity, std::move(found->source));
         const bool expected = root().pe_file().isPe32Plus();
-        const bool actual = module->pe_file().isPe32Plus();
+        const bool actual = file->isPe32Plus();
         if (expected != actual) {
             resolution.error = DependencyError{
                 DependencyError::Code::ArchitectureMismatch,
@@ -85,6 +77,7 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
                 expected,
                 actual};
         } else {
+            std::unique_ptr<ModuleNode> module(new ModuleNode(identity, *file));
             resolution.module = module.get();
             m_modules.push_back(std::move(module));
         }
@@ -99,6 +92,9 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
 
 void DependencyGraph::build() {
     m_modules.resize(1);
+    // Stored files belong to the previous build; resolve into a fresh store so a
+    // rebuild reopens children and drops files the new build no longer uses.
+    m_files.clear();
     auto* rootModule = m_modules.front().get();
     rootModule->m_dependencies.clear();
     rootModule->m_dependents.clear();

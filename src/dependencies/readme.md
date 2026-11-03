@@ -18,7 +18,7 @@ graph.build();
 for (const auto& edge : graph.root().dependencies()) {
     if (edge.isResolved()) {
         const auto& module = *edge.module;
-        const auto& imports = module.file().imports();
+        const auto& imports = module.pe_file().imports();
         const auto& callers = module.dependents();
         // module.dependencies() 给出下一层依赖。
     } else {
@@ -29,7 +29,10 @@ for (const auto& edge : graph.root().dependencies()) {
 ```
 
 根 `PeFile` 必须已经成功解析；根文件及其数据源由调用方持有，生命周期必须覆盖图。
-图拥有其余模块和对应的数据源，并保证先释放 `PeFile`，再释放数据源。
+其余模块的 `PeFile` 和数据源由图内部的 `PeFileStore` 统一持有，并按定位器身份去重；
+Store 保证先释放 `PeFile`，再释放其借用的数据源。`graph.files()` 提供只读访问，
+可用于诊断；根文件不在 Store 中。位数不匹配的模块虽然不进入依赖图，但解析成功后仍由
+Store 管理，直到重新构建或图析构。
 节点地址在一次构建内保持稳定，因此可直接用节点指针表示共享依赖、循环和反向引用，
 不需要额外的模块 ID、全局 ID 分配器或单独的遍历器。
 
@@ -40,8 +43,9 @@ for (const auto& edge : graph.root().dependencies()) {
 调用方可通过 `std::rethrow_exception(error.exception)` 取得原始 `ParseError` 或
 `PeDataSourceError`；缺失文件和位数不匹配不包含异常。
 
-再次 `build()` 会重新读取子模块并清空旧关系和错误缓存，根节点地址保持不变，
-根 `PeFile` 不会重新解析。所有旧的子节点、依赖边和反向依赖引用均失效。
+再次 `build()` 会重新读取子模块并清空旧关系和错误缓存，同时清空 `PeFileStore` 并
+重新解析；根节点地址保持不变，根 `PeFile` 不会重新解析。所有旧的子节点、依赖边和
+反向依赖引用均失效。
 构建期间不要并发修改或查询同一张图，也不要重新解析其根文件。
 
 ## 定位配置
@@ -111,3 +115,4 @@ ctest --test-dir out/build/debug --output-on-failure
   API Set 别名身份；Windows 上额外验证本机 schema。
 - `dependency_graph_tests`：共享与循环依赖、反向查询、缺失和无效模块、位数不匹配、
   读取失败、别名错误缓存、重新构建和数据源生命周期。
+- `pe_file_store_tests`：身份去重、稳定地址、所有权转移、失败回滚和清空行为。
