@@ -6,8 +6,8 @@ add_library(${PROJECT_NAME} STATIC
     file_module_searcher.cpp
     file_module_searcher.h
     module_searcher.h
-    dependencies_tree.cpp
-    dependencies_tree.h
+    dependency_graph.cpp
+    dependency_graph.h
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC parse)

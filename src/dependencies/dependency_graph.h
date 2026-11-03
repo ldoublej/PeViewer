@@ -14,7 +14,7 @@
 
 class DependencyModule;
 
-struct DependencyIssue {
+struct DependencyError {
     enum class Code : std::int8_t { NotFound, ReadError, ParseError, ArchitectureMismatch };
     Code code = Code::NotFound;
     QString message;
@@ -24,25 +24,25 @@ struct DependencyIssue {
     bool actualPe32Plus = false;
 };
 
-struct Dependency {
+struct DependencyEdge {
     QString dllName;
     const DependencyModule* module = nullptr;
     // Present exactly when module is null. A bad edge does not stop other modules.
-    std::optional<DependencyIssue> issue;
+    std::optional<DependencyError> error;
     bool isResolved() const { return module != nullptr; }
 };
 
-// The tree owns nodes. References/pointers are borrowed; rebuilding invalidates
+// The graph owns nodes. References/pointers are borrowed; rebuilding invalidates
 // all child nodes and edges, while the root node remains at the same address.
 class DependencyModule {
 public:
     const QString& identity() const { return m_identity; }
     const PeFile& file() const { return *m_file; }
-    const std::vector<Dependency>& dependencies() const { return m_dependencies; }
+    const std::vector<DependencyEdge>& dependencies() const { return m_dependencies; }
     const std::vector<const DependencyModule*>& dependents() const { return m_dependents; }
 
 private:
-    friend class DependenciesTree;
+    friend class DependencyGraph;
     DependencyModule(QString identity, const PeFile& borrowed);
     explicit DependencyModule(ResolvedModule resolved);
     QString m_identity;
@@ -50,28 +50,28 @@ private:
     std::unique_ptr<PeDataSource> m_source;
     std::unique_ptr<PeFile> m_ownedFile;
     const PeFile* m_file = nullptr;
-    std::vector<Dependency> m_dependencies;
+    std::vector<DependencyEdge> m_dependencies;
     std::vector<const DependencyModule*> m_dependents;
 };
 
-class DependenciesTree {
+class DependencyGraph {
 public:
-    // root must already be parsed. It and its data source must outlive the tree.
+    // root must already be parsed. It and its data source must outlive the graph.
     // Application directory and target bitness are derived from root.
-    explicit DependenciesTree(const PeFile& root,
-                              FileSearchOptions options = FileSearchOptions::systemDefaults());
+    explicit DependencyGraph(const PeFile& root,
+                             FileSearchOptions options = FileSearchOptions::systemDefaults());
     // A custom searcher can supply any file-layout source, including in-memory test data.
-    DependenciesTree(const PeFile& root, QString rootIdentity,
-                     std::unique_ptr<ModuleSearcher> searcher);
+    DependencyGraph(const PeFile& root, QString rootIdentity,
+                    std::unique_ptr<ModuleSearcher> searcher);
     void build();
     const DependencyModule& root() const { return *m_modules.front(); }
     std::size_t moduleCount() const { return m_modules.size(); }
 
 private:
-    Q_DISABLE_COPY_MOVE(DependenciesTree)
+    Q_DISABLE_COPY_MOVE(DependencyGraph)
     struct Resolution {
         DependencyModule* module = nullptr;
-        std::optional<DependencyIssue> issue;
+        std::optional<DependencyError> error;
     };
     Resolution resolve(const QString& name);
     std::unique_ptr<ModuleSearcher> m_searcher;

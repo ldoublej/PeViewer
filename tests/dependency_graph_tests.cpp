@@ -1,4 +1,4 @@
-#include <dependencies_tree.h>
+#include <dependency_graph.h>
 #include <pe_file_data_source.h>
 
 #include <QTemporaryDir>
@@ -9,18 +9,18 @@
 using namespace DependencyTests;
 
 namespace {
-const Dependency& dependency(const DependencyModule& module, const QString& name) {
+const DependencyEdge& dependency(const DependencyModule& module, const QString& name) {
     for (const auto& entry : module.dependencies()) {
         if (entry.dllName == name) {
             return entry;
         }
     }
-    throw std::runtime_error("Dependency was not recorded");
+    throw std::runtime_error("Dependency edge was not recorded");
 }
 
 const DependencyModule& resolved(const DependencyModule& module, const QString& name) {
     const auto& entry = dependency(module, name);
-    require(entry.isResolved() && !entry.issue, "Expected resolved dependency");
+    require(entry.isResolved() && !entry.error, "Expected resolved dependency");
     return *entry.module;
 }
 
@@ -39,13 +39,13 @@ void fileGraph() {
     PeFileDataSource source(dir.filePath(QStringLiteral("app.exe")));
     PeFile root(source);
     root.parse();
-    DependenciesTree tree(root, FileSearchOptions{});
-    const auto* rootNode = &tree.root();
+    DependencyGraph graph(root, FileSearchOptions{});
+    const auto* rootNode = &graph.root();
     require(&rootNode->file() == &root && rootNode->dependencies().empty(),
             "Root is not borrowed before build");
-    tree.build();
-    const auto& a = resolved(tree.root(), QStringLiteral("a.dll"));
-    const auto& b = resolved(tree.root(), QStringLiteral("b.dll"));
+    graph.build();
+    const auto& a = resolved(graph.root(), QStringLiteral("a.dll"));
+    const auto& b = resolved(graph.root(), QStringLiteral("b.dll"));
     const auto& shared = resolved(a, QStringLiteral("shared.dll"));
     require(&resolved(b, QStringLiteral("SHARED.DLL")) == &shared,
             "Shared dependency was duplicated");
@@ -55,28 +55,28 @@ void fileGraph() {
             "Reverse edges are incorrect");
     require(a.dependents() == std::vector<const DependencyModule*>{rootNode, &shared},
             "Cycle reverse edges are incorrect");
-    require(tree.moduleCount() == 4, "Unexpected module count");
-    const auto& edges = tree.root().dependencies();
+    require(graph.moduleCount() == 4, "Unexpected module count");
+    const auto& edges = graph.root().dependencies();
     require(edges.size() == 4 && edges[0].dllName == QStringLiteral("a.dll") &&
                 edges[1].dllName == QStringLiteral("b.dll"),
             "Import order was lost");
-    require(!edges[2].module && edges[2].issue->code == DependencyIssue::Code::NotFound,
-            "Missing module issue was not retained");
-    require(!edges[3].module && edges[3].issue->code == DependencyIssue::Code::ParseError,
-            "Invalid PE issue was not retained");
-    require(edges[3].issue->exception != nullptr, "Original parse exception was discarded");
+    require(!edges[2].module && edges[2].error->code == DependencyError::Code::NotFound,
+            "Missing module error was not retained");
+    require(!edges[3].module && edges[3].error->code == DependencyError::Code::ParseError,
+            "Invalid PE error was not retained");
+    require(edges[3].error->exception != nullptr, "Original parse exception was discarded");
 
     // Root identity is stable; rebuilding reopens children and refreshes failed edges.
     writePe(dir, QStringLiteral("missing.dll"));
     writePe(dir, QStringLiteral("a.dll"), {QStringLiteral("missing.dll")});
-    tree.build();
-    require(&tree.root() == rootNode && &tree.root().file() == &root, "Rebuild replaced the root");
-    const auto& missing = resolved(tree.root(), QStringLiteral("missing.dll"));
-    const auto& rebuiltA = resolved(tree.root(), QStringLiteral("a.dll"));
+    graph.build();
+    require(&graph.root() == rootNode && &graph.root().file() == &root, "Rebuild replaced the root");
+    const auto& missing = resolved(graph.root(), QStringLiteral("missing.dll"));
+    const auto& rebuiltA = resolved(graph.root(), QStringLiteral("a.dll"));
     require(&resolved(rebuiltA, QStringLiteral("missing.dll")) == &missing,
             "Rebuild reused old results");
-    require(tree.root().dependents().empty(), "Rebuild retained obsolete reverse edges");
-    require(root.imports().size() == 4, "Tree modified borrowed root imports");
+    require(graph.root().dependents().empty(), "Rebuild retained obsolete reverse edges");
+    require(root.imports().size() == 4, "Graph modified borrowed root imports");
 }
 
 struct SourceState {
@@ -160,23 +160,23 @@ void customSources() {
         {QStringLiteral("wide_alias.dll"), {QStringLiteral("wide"), wide}},
         {QStringLiteral("read_error.dll"), {QStringLiteral("read_error"), unreadable}}};
     {
-        DependenciesTree tree(root, QStringLiteral("root"), std::move(searcher));
-        tree.build();
-        const auto& childNode = resolved(tree.root(), QStringLiteral("child.dll"));
-        require(&resolved(tree.root(), QStringLiteral("alias.dll")) == &childNode,
+        DependencyGraph graph(root, QStringLiteral("root"), std::move(searcher));
+        graph.build();
+        const auto& childNode = resolved(graph.root(), QStringLiteral("child.dll"));
+        require(&resolved(graph.root(), QStringLiteral("alias.dll")) == &childNode,
                 "Custom identity aliases were not merged");
-        require(&resolved(childNode, QStringLiteral("root.dll")) == &tree.root(),
+        require(&resolved(childNode, QStringLiteral("root.dll")) == &graph.root(),
                 "Custom source root cycle failed");
         require(childNode.dependents().size() == 1, "Reverse edges contain duplicate parent");
         require(rootState->reads == rootReads, "Borrowed root was parsed again");
         require(bad->reads == 1, "Failed module was parsed again through alias");
-        require(tree.moduleCount() == 2 && child->alive == 1, "Child ownership is incorrect");
+        require(graph.moduleCount() == 2 && child->alive == 1, "Child ownership is incorrect");
         require(bad->alive == 0 && wide->alive == 0 && unreadable->alive == 0,
                 "Failed dependency leaked its data source");
-        const auto& mismatch = dependency(tree.root(), QStringLiteral("wide.dll"));
+        const auto& mismatch = dependency(graph.root(), QStringLiteral("wide.dll"));
         require(!mismatch.module &&
-                    mismatch.issue->code == DependencyIssue::Code::ArchitectureMismatch &&
-                    !mismatch.issue->expectedPe32Plus && mismatch.issue->actualPe32Plus,
+                    mismatch.error->code == DependencyError::Code::ArchitectureMismatch &&
+                    !mismatch.error->expectedPe32Plus && mismatch.error->actualPe32Plus,
                 "Architecture mismatch was not retained");
         const auto wideReads = wide->reads;
         CountingSource wideSource(wide);
@@ -185,22 +185,22 @@ void customSources() {
         require(wide->reads == wideReads * 2, "Architecture failure was not cached by identity");
         for (const auto& name :
              {QStringLiteral("read_error.dll"), QStringLiteral("search_error.dll")}) {
-            const auto& edge = dependency(tree.root(), name);
-            require(!edge.module && edge.issue->code == DependencyIssue::Code::ReadError &&
-                        edge.issue->exception,
+            const auto& edge = dependency(graph.root(), name);
+            require(!edge.module && edge.error->code == DependencyError::Code::ReadError &&
+                        edge.error->exception,
                     "Read error was not retained");
             expectException<PeDataSourceError>(
-                [&] { std::rethrow_exception(edge.issue->exception); });
+                [&] { std::rethrow_exception(edge.error->exception); });
         }
         const auto childReads = child->reads;
-        tree.build();
+        graph.build();
         require(child->alive == 1 && child->reads == childReads * 2,
                 "Rebuild did not release/reparse owned children");
         require(rootState->reads == rootReads && rootState->alive == 1,
-                "Tree took ownership of root data source");
+                "Graph took ownership of root data source");
     }
     require(child->alive == 0 && rootState->alive == 1,
-            "Tree destruction violated source ownership");
+            "Graph destruction violated source ownership");
 }
 
 void configuredPathsAndValidation() {
@@ -215,23 +215,23 @@ void configuredPathsAndValidation() {
     PeFileDataSource source(dir.filePath(QStringLiteral("app/app.exe")));
     PeFile root(source);
     expectException<std::invalid_argument>([&] {
-        DependenciesTree tree(root, QStringLiteral("root"), std::make_unique<TestSearcher>());
+        DependencyGraph graph(root, QStringLiteral("root"), std::make_unique<TestSearcher>());
     });
     root.parse();
     expectException<std::invalid_argument>(
-        [&] { DependenciesTree tree(root, QStringLiteral("root"), nullptr); });
+        [&] { DependencyGraph graph(root, QStringLiteral("root"), nullptr); });
     expectException<std::invalid_argument>(
-        [&] { DependenciesTree tree(root, QString{}, std::make_unique<TestSearcher>()); });
+        [&] { DependencyGraph graph(root, QString{}, std::make_unique<TestSearcher>()); });
     FileSearchOptions options;
     options.workDirectory = dir.filePath(QStringLiteral("work"));
     options.fallbackDirectories = QStringList{dir.filePath(QStringLiteral("extra"))};
     options.appDirectory = dir.filePath(QStringLiteral("incorrect_app"));
     options.isPe32Plus = true;  // The root's 32-bit format overrides this hint.
-    DependenciesTree tree(root, options);
-    tree.build();
-    require(tree.moduleCount() == 4,
+    DependencyGraph graph(root, options);
+    graph.build();
+    require(graph.moduleCount() == 4,
             "Configured application/fallback/work directories were not searched");
-    for (const auto& edge : tree.root().dependencies()) {
+    for (const auto& edge : graph.root().dependencies()) {
         require(edge.isResolved(),
                 "An unrelated failure prevented other dependencies from resolving");
     }
@@ -257,16 +257,16 @@ void longChain() {
     }
     searcher->modules.insert(QStringLiteral("root.dll"), {QStringLiteral("root"), rootState});
     {
-        DependenciesTree tree(root, QStringLiteral("root"), std::move(searcher));
-        tree.build();
-        require(tree.moduleCount() == Count + 1, "Long dependency chain was truncated");
-        const auto* node = &tree.root();
+        DependencyGraph graph(root, QStringLiteral("root"), std::move(searcher));
+        graph.build();
+        require(graph.moduleCount() == Count + 1, "Long dependency chain was truncated");
+        const auto* node = &graph.root();
         for (int i = 0; i <= Count; ++i) {
             require(node->dependencies().size() == 1 && node->dependencies()[0].isResolved(),
                     "Long dependency chain contains an unresolved edge");
             node = node->dependencies()[0].module;
         }
-        require(node == &tree.root(), "Long dependency cycle failed to close");
+        require(node == &graph.root(), "Long dependency cycle failed to close");
     }
     for (const auto& state : states) {
         require(state->alive == 0, "Long dependency graph leaked an owned source");

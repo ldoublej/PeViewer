@@ -6,30 +6,30 @@ C++17 静态库，链接 CMake target `dependencies` 即可使用；公共依赖
 ## 文件依赖图
 
 ```cpp
-#include <dependencies_tree.h>
+#include <dependency_graph.h>
 #include <pe_file_data_source.h>
 
 PeFileDataSource source(path);
 PeFile file(source);
 file.parse();
 
-DependenciesTree tree(file);
-tree.build();
-for (const auto& dependency : tree.root().dependencies()) {
-    if (dependency.isResolved()) {
-        const auto& module = *dependency.module;
+DependencyGraph graph(file);
+graph.build();
+for (const auto& edge : graph.root().dependencies()) {
+    if (edge.isResolved()) {
+        const auto& module = *edge.module;
         const auto& imports = module.file().imports();
         const auto& callers = module.dependents();
         // module.dependencies() 给出下一层依赖。
     } else {
-        const auto& issue = *dependency.issue;
-        // issue.code / issue.message 描述失败；exception 保留原始异常及其字段。
+        const auto& error = *edge.error;
+        // error.code / error.message 描述失败；exception 保留原始异常及其字段。
     }
 }
 ```
 
-根 `PeFile` 必须已经成功解析；根文件及其数据源由调用方持有，生命周期必须覆盖树。
-树拥有其余模块和对应的数据源，并保证先释放 `PeFile`，再释放数据源。
+根 `PeFile` 必须已经成功解析；根文件及其数据源由调用方持有，生命周期必须覆盖图。
+图拥有其余模块和对应的数据源，并保证先释放 `PeFile`，再释放数据源。
 节点地址在一次构建内保持稳定，因此可直接用节点指针表示共享依赖、循环和反向引用，
 不需要额外的模块 ID、全局 ID 分配器或单独的遍历器。
 
@@ -37,12 +37,12 @@ for (const auto& dependency : tree.root().dependencies()) {
 按规范化文件路径去重，缓存解析错误和位数不匹配；DLL 别名不会造成重复解析。
 直接依赖保留导入表顺序，同一父模块在反向依赖中只出现一次。
 缺失文件、读取错误、无效 PE、32/64 位不匹配均保存在对应边中，继续处理其他依赖。
-调用方可通过 `std::rethrow_exception(issue.exception)` 取得原始 `ParseError` 或
+调用方可通过 `std::rethrow_exception(error.exception)` 取得原始 `ParseError` 或
 `PeDataSourceError`；缺失文件和位数不匹配不包含异常。
 
 再次 `build()` 会重新读取子模块并清空旧关系和错误缓存，根节点地址保持不变，
 根 `PeFile` 不会重新解析。所有旧的子节点、依赖边和反向依赖引用均失效。
-构建期间不要并发修改或查询同一棵树，也不要重新解析其根文件。
+构建期间不要并发修改或查询同一张图，也不要重新解析其根文件。
 
 ## 搜索配置
 
@@ -57,10 +57,10 @@ for (const auto& dependency : tree.root().dependencies()) {
 auto options = FileSearchOptions::systemDefaults();
 options.workDirectory = targetWorkingDirectory;
 options.fallbackDirectories.append(extraDirectory);
-DependenciesTree tree(file, options);
+DependencyGraph graph(file, options);
 ```
 
-树根据根模块设置应用目录和目标位数，覆盖配置中的 `appDirectory` 和 `isPe32Plus`。
+图根据根模块设置应用目录和目标位数，覆盖配置中的 `appDirectory` 和 `isPe32Plus`。
 调用方应使用绝对路径配置应用、系统、工作和额外目录。
 搜索顺序为 API Set 宿主映射、KnownDLLs，然后是应用目录、目标位数的系统目录、
 Windows/System、Windows、显式指定的目标工作目录、PATH、额外回退目录。
@@ -91,7 +91,7 @@ KnownDLLs 只使用对应系统目录，缺失时不回退到应用目录的同�
 空身份、空数据源等接口误用抛出 `std::invalid_argument`。
 
 ```cpp
-DependenciesTree tree(file, rootIdentity, std::move(customSearcher));
+DependencyGraph graph(file, rootIdentity, std::move(customSearcher));
 ```
 
 当前 C++ 解析器仅支持文件布局，因此自定义源也须提供文件布局的 PE 字节。
@@ -109,5 +109,5 @@ ctest --test-dir out/build/debug --output-on-failure
   以及从 PE 文件读取 `.apiset`。
 - `module_searcher_tests`：完整搜索顺序、KnownDLLs 优先级、位数、显式路径、目标工作目录、
   API Set 别名身份；Windows 上额外验证本机 schema。
-- `dependencies_tree_tests`：共享与循环依赖、反向查询、缺失和无效模块、位数不匹配、
+- `dependency_graph_tests`：共享与循环依赖、反向查询、缺失和无效模块、位数不匹配、
   读取失败、别名错误缓存、重新构建和数据源生命周期。

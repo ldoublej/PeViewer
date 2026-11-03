@@ -1,4 +1,4 @@
-#include "dependencies_tree.h"
+#include "dependency_graph.h"
 
 #include <QFileInfo>
 #include <algorithm>
@@ -16,7 +16,7 @@ std::unique_ptr<ModuleSearcher> fileSearcher(const PeFile& root, FileSearchOptio
     return std::make_unique<FileModuleSearcher>(std::move(options));
 }
 
-DependencyIssue currentIssue(DependencyIssue::Code code, const std::exception& error) {
+DependencyError currentError(DependencyError::Code code, const std::exception& error) {
     return {code, QString::fromUtf8(error.what()), std::current_exception(), false, false};
 }
 }  // namespace
@@ -32,30 +32,30 @@ DependencyModule::DependencyModule(ResolvedModule resolved)
     m_ownedFile->parse();
 }
 
-DependenciesTree::DependenciesTree(const PeFile& root, FileSearchOptions options)
-    : DependenciesTree(root, FileModuleSearcher::fileIdentity(root.dataSource().url()),
-                       fileSearcher(root, std::move(options))) {}
+DependencyGraph::DependencyGraph(const PeFile& root, FileSearchOptions options)
+    : DependencyGraph(root, FileModuleSearcher::fileIdentity(root.dataSource().url()),
+                      fileSearcher(root, std::move(options))) {}
 
-DependenciesTree::DependenciesTree(const PeFile& root, QString rootIdentity,
-                                   std::unique_ptr<ModuleSearcher> searcher)
+DependencyGraph::DependencyGraph(const PeFile& root, QString rootIdentity,
+                                 std::unique_ptr<ModuleSearcher> searcher)
     : m_searcher(std::move(searcher)) {
     if (!root.isParsed() || rootIdentity.isEmpty() || !m_searcher) {
         throw std::invalid_argument(
-            "DependenciesTree requires a parsed root, identity and searcher");
+            "DependencyGraph requires a parsed root, identity and searcher");
     }
     m_modules.push_back(
         std::unique_ptr<DependencyModule>(new DependencyModule(std::move(rootIdentity), root)));
 }
 
-DependenciesTree::Resolution DependenciesTree::resolve(const QString& name) {
+DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
     std::optional<ResolvedModule> found;
     try {
         found = m_searcher->findModule(name);
     } catch (const PeDataSourceError& error) {
-        return {nullptr, currentIssue(DependencyIssue::Code::ReadError, error)};
+        return {nullptr, currentError(DependencyError::Code::ReadError, error)};
     }
     if (!found) {
-        return {nullptr, DependencyIssue{DependencyIssue::Code::NotFound,
+        return {nullptr, DependencyError{DependencyError::Code::NotFound,
                                          QStringLiteral("Module not found: %1").arg(name),
                                          {},
                                          false,
@@ -76,8 +76,8 @@ DependenciesTree::Resolution DependenciesTree::resolve(const QString& name) {
         const bool expected = root().file().isPe32Plus();
         const bool actual = module->file().isPe32Plus();
         if (expected != actual) {
-            resolution.issue = DependencyIssue{
-                DependencyIssue::Code::ArchitectureMismatch,
+            resolution.error = DependencyError{
+                DependencyError::Code::ArchitectureMismatch,
                 QStringLiteral("Module bitness mismatch: expected %1-bit, found %2-bit")
                     .arg(expected ? 64 : 32)
                     .arg(actual ? 64 : 32),
@@ -89,15 +89,15 @@ DependenciesTree::Resolution DependenciesTree::resolve(const QString& name) {
             m_modules.push_back(std::move(module));
         }
     } catch (const ParseError& error) {
-        resolution.issue = currentIssue(DependencyIssue::Code::ParseError, error);
+        resolution.error = currentError(DependencyError::Code::ParseError, error);
     } catch (const PeDataSourceError& error) {
-        resolution.issue = currentIssue(DependencyIssue::Code::ReadError, error);
+        resolution.error = currentError(DependencyError::Code::ReadError, error);
     }
     m_resolutions.insert(identity, resolution);
     return resolution;
 }
 
-void DependenciesTree::build() {
+void DependencyGraph::build() {
     m_modules.resize(1);
     auto* rootModule = m_modules.front().get();
     rootModule->m_dependencies.clear();
@@ -113,7 +113,7 @@ void DependenciesTree::build() {
         parent->m_dependencies.reserve(imports.size());
         for (const auto& imported : imports) {
             const auto result = resolve(imported.dllName());
-            parent->m_dependencies.push_back({imported.dllName(), result.module, result.issue});
+            parent->m_dependencies.push_back({imported.dllName(), result.module, result.error});
             if (result.module) {
                 auto& dependents = result.module->m_dependents;
                 if (std::find(dependents.begin(), dependents.end(), parent) == dependents.end()) {
