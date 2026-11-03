@@ -54,12 +54,13 @@ private:
 
 class DependencyGraph {
 public:
-    // root must already be parsed. It and its data source must outlive the graph.
+    // files must be dedicated to this graph and outlive it. root must already be
+    // parsed; it and its data source must outlive the graph.
     // Application directory and target bitness are derived from root.
-    explicit DependencyGraph(const PeFile& root,
-                             FileLocatorOptions options = FileLocatorOptions::systemDefaults());
+    DependencyGraph(const PeFile& root, PeFileStore& files,
+                    FileLocatorOptions options = FileLocatorOptions::systemDefaults());
     // A custom locator can supply any file-layout source, including in-memory test data.
-    DependencyGraph(const PeFile& root, QString rootIdentity,
+    DependencyGraph(const PeFile& root, PeFileStore& files, QString rootIdentity,
                     std::unique_ptr<ModuleLocator> locator);
     void build();
     const ModuleNode& root() const { return *m_modules.front(); }
@@ -75,7 +76,7 @@ private:
     };
     Resolution resolve(const QString& name);
     // Declared before the nodes so stored files outlive every ModuleNode.
-    PeFileStore m_files;
+    PeFileStore& m_files;
     std::unique_ptr<ModuleLocator> m_locator;
     std::vector<std::unique_ptr<ModuleNode>> m_modules;
     QHash<QString, Resolution> m_resolutions;

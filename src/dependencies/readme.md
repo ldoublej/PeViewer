@@ -8,12 +8,14 @@ C++17 静态库，链接 CMake target `dependencies` 即可使用；公共依赖
 ```cpp
 #include <dependency_graph.h>
 #include <pe_file_data_source.h>
+#include <pe_file_store.h>
 
 PeFileDataSource source(path);
 PeFile file(source);
 file.parse();
 
-DependencyGraph graph(file);
+PeFileStore files;
+DependencyGraph graph(file, files);
 graph.build();
 for (const auto& edge : graph.root().dependencies()) {
     if (edge.isResolved()) {
@@ -29,10 +31,11 @@ for (const auto& edge : graph.root().dependencies()) {
 ```
 
 根 `PeFile` 必须已经成功解析；根文件及其数据源由调用方持有，生命周期必须覆盖图。
-其余模块的 `PeFile` 和数据源由图内部的 `PeFileStore` 统一持有，并按定位器身份去重；
-Store 保证先释放 `PeFile`，再释放其借用的数据源。`graph.files()` 提供只读访问，
-可用于诊断；根文件不在 Store 中。位数不匹配的模块虽然不进入依赖图，但解析成功后仍由
-Store 管理，直到重新构建或图析构。
+其余模块的 `PeFile` 和数据源由调用方提供的 `PeFileStore` 统一持有，并按定位器身份
+去重；Store 需专属于该图且生命周期覆盖图，图会在 `build()` 时清空它。Store 保证先释放
+`PeFile`，再释放其借用的数据源。`graph.files()` 提供只读访问，可用于诊断；根文件
+不在 Store 中。位数不匹配的模块虽然不进入依赖图，但解析成功后仍由 Store 管理，
+直到重新构建或图析构。
 节点地址在一次构建内保持稳定，因此可直接用节点指针表示共享依赖、循环和反向引用，
 不需要额外的模块 ID、全局 ID 分配器或单独的遍历器。
 
@@ -61,7 +64,7 @@ Store 管理，直到重新构建或图析构。
 auto options = FileLocatorOptions::systemDefaults();
 options.workDirectory = targetWorkingDirectory;
 options.fallbackDirectories.append(extraDirectory);
-DependencyGraph graph(file, options);
+DependencyGraph graph(file, files, options);
 ```
 
 图根据根模块设置应用目录和目标位数，覆盖配置中的 `appDirectory` 和 `isPe32Plus`。
@@ -95,7 +98,7 @@ KnownDLLs 只使用对应系统目录，缺失时不回退到应用目录的同�
 空身份、空数据源等接口误用抛出 `std::invalid_argument`。
 
 ```cpp
-DependencyGraph graph(file, rootIdentity, std::move(customLocator));
+DependencyGraph graph(file, files, rootIdentity, std::move(customLocator));
 ```
 
 当前 C++ 解析器仅支持文件布局，因此自定义源也须提供文件布局的 PE 字节。

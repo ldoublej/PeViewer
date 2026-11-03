@@ -39,7 +39,8 @@ void fileGraph() {
     PeFileDataSource source(dir.filePath(QStringLiteral("app.exe")));
     PeFile root(source);
     root.parse();
-    DependencyGraph graph(root, FileLocatorOptions{});
+    PeFileStore files;
+    DependencyGraph graph(root, files, FileLocatorOptions{});
     const auto* rootNode = &graph.root();
     require(&rootNode->pe_file() == &root && rootNode->dependencies().empty(),
             "Root is not borrowed before build");
@@ -163,7 +164,8 @@ void customSources() {
         {QStringLiteral("wide_alias.dll"), {QStringLiteral("wide"), wide}},
         {QStringLiteral("read_error.dll"), {QStringLiteral("read_error"), unreadable}}};
     {
-        DependencyGraph graph(root, QStringLiteral("root"), std::move(locator));
+        PeFileStore files;
+        DependencyGraph graph(root, files, QStringLiteral("root"), std::move(locator));
         graph.build();
         const auto& childNode = resolved(graph.root(), QStringLiteral("child.dll"));
         require(&resolved(graph.root(), QStringLiteral("alias.dll")) == &childNode,
@@ -222,20 +224,21 @@ void configuredPathsAndValidation() {
     writePe(dir, QStringLiteral("work/work.dll"));
     PeFileDataSource source(dir.filePath(QStringLiteral("app/app.exe")));
     PeFile root(source);
+    PeFileStore files;
     expectException<std::invalid_argument>([&] {
-        DependencyGraph graph(root, QStringLiteral("root"), std::make_unique<TestLocator>());
+        DependencyGraph graph(root, files, QStringLiteral("root"), std::make_unique<TestLocator>());
     });
     root.parse();
     expectException<std::invalid_argument>(
-        [&] { DependencyGraph graph(root, QStringLiteral("root"), nullptr); });
+        [&] { DependencyGraph graph(root, files, QStringLiteral("root"), nullptr); });
     expectException<std::invalid_argument>(
-        [&] { DependencyGraph graph(root, QString{}, std::make_unique<TestLocator>()); });
+        [&] { DependencyGraph graph(root, files, QString{}, std::make_unique<TestLocator>()); });
     FileLocatorOptions options;
     options.workDirectory = dir.filePath(QStringLiteral("work"));
     options.fallbackDirectories = QStringList{dir.filePath(QStringLiteral("extra"))};
     options.appDirectory = dir.filePath(QStringLiteral("incorrect_app"));
     options.isPe32Plus = true;  // The root's 32-bit format overrides this hint.
-    DependencyGraph graph(root, options);
+    DependencyGraph graph(root, files, options);
     graph.build();
     require(graph.moduleCount() == 4,
             "Configured application/fallback/work directories were not searched");
@@ -265,7 +268,8 @@ void longChain() {
     }
     locator->modules.insert(QStringLiteral("root.dll"), {QStringLiteral("root"), rootState});
     {
-        DependencyGraph graph(root, QStringLiteral("root"), std::move(locator));
+        PeFileStore files;
+        DependencyGraph graph(root, files, QStringLiteral("root"), std::move(locator));
         graph.build();
         require(graph.moduleCount() == Count + 1, "Long dependency chain was truncated");
         const auto* node = &graph.root();

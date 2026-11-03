@@ -5,12 +5,10 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMessageBox>
-#include <memory>
 
 #include "dependency_graph.h"
 #include "language_manager.h"
-#include "pe_file.h"
-#include "pe_file_data_source.h"
+#include "workspace.h"
 
 PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     : QMainWindow(parent), m_languageManager(languageManager) {
@@ -35,7 +33,8 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
 }
 
 PeViewer::~PeViewer() {
-    // The model borrows the graph, so detach it before members are destroyed.
+    // The model borrows the workspace's graph, so detach it before the manager
+    // destroys the current workspace.
     ui.dependencyTree->clear();
 }
 
@@ -46,27 +45,19 @@ void PeViewer::on_actionOpen_triggered(bool b) {
         return;
     }
 
+    // Detach first; if the new file fails to open the old session is reattached.
+    ui.dependencyTree->clear();
     try {
-        auto dataSource = std::make_unique<PeFileDataSource>(fileName);
-        auto peFile = std::make_unique<PeFile>(*dataSource);
-        peFile->parse();
-        auto graph = std::make_unique<DependencyGraph>(*peFile);
-        graph->build();
-
-        // Only replace the displayed file once the new one has loaded cleanly.
-        ui.dependencyTree->clear();
-        m_dependencyGraph.reset();
-        m_peFile.reset();
-        m_dataSource.reset();
-
-        m_dataSource = std::move(dataSource);
-        m_peFile = std::move(peFile);
-        m_dependencyGraph = std::move(graph);
-        ui.dependencyTree->setGraph(m_dependencyGraph.get());
-        ui.statusBar->showMessage(tr("Loaded %1: %2 modules")
-                                      .arg(QFileInfo(fileName).fileName())
-                                      .arg(static_cast<qulonglong>(m_dependencyGraph->moduleCount())));
+        Workspace* workspace = m_workspaceManager.open(fileName);
+        ui.dependencyTree->setGraph(&workspace->graph());
+        ui.statusBar->showMessage(
+            tr("Loaded %1: %2 modules")
+                .arg(QFileInfo(fileName).fileName())
+                .arg(static_cast<qulonglong>(workspace->graph().moduleCount())));
     } catch (const std::exception& error) {
+        if (Workspace* current = m_workspaceManager.current()) {
+            ui.dependencyTree->setGraph(&current->graph());
+        }
         QMessageBox::warning(this, tr("Open Failed"),
                              tr("Could not load %1:\n%2")
                                  .arg(fileName, QString::fromUtf8(error.what())));

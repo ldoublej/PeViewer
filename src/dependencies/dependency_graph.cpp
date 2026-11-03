@@ -24,13 +24,14 @@ DependencyError currentError(DependencyError::Code code, const std::exception& e
 ModuleNode::ModuleNode(QString identity, const PeFile& borrowed)
     : m_identity(std::move(identity)), m_file(&borrowed) {}
 
-DependencyGraph::DependencyGraph(const PeFile& root, FileLocatorOptions options)
-    : DependencyGraph(root, FileModuleLocator::fileIdentity(root.dataSource().url()),
+DependencyGraph::DependencyGraph(const PeFile& root, PeFileStore& files,
+                                 FileLocatorOptions options)
+    : DependencyGraph(root, files, FileModuleLocator::fileIdentity(root.dataSource().url()),
                       fileLocator(root, std::move(options))) {}
 
-DependencyGraph::DependencyGraph(const PeFile& root, QString rootIdentity,
+DependencyGraph::DependencyGraph(const PeFile& root, PeFileStore& files, QString rootIdentity,
                                  std::unique_ptr<ModuleLocator> locator)
-    : m_locator(std::move(locator)) {
+    : m_files(files), m_locator(std::move(locator)) {
     if (!root.isParsed() || rootIdentity.isEmpty() || !m_locator) {
         throw std::invalid_argument(
             "DependencyGraph requires a parsed root, identity and locator");

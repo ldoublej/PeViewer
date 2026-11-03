@@ -13,6 +13,10 @@ foreach(test IN ITEMS api_set module_locator dependency_graph pe_file_store)
     add_test(NAME ${test}_tests COMMAND ${test}_tests)
 endforeach()
 
+add_executable(WorkspaceTests workspace_tests.cpp)
+target_link_libraries(WorkspaceTests PRIVATE workspace)
+add_test(NAME WorkspaceTests COMMAND WorkspaceTests)
+
 add_executable(PeViewerUiTests
     pe_viewer_ui_tests.cpp
     ../src/peviewer/pe_viewer.cpp
@@ -32,7 +36,7 @@ add_executable(PeViewerUiTests
 )
 set_target_properties(PeViewerUiTests PROPERTIES AUTORCC ON)
 target_include_directories(PeViewerUiTests PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
-target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets parse dependencies)
+target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets workspace)
 add_dependencies(PeViewerUiTests peviewer_translations)
 add_test(NAME PeViewerUiTests COMMAND PeViewerUiTests)
 set_tests_properties(PeViewerUiTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
