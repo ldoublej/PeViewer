@@ -39,7 +39,7 @@ void fileGraph() {
     PeFileDataSource source(dir.filePath(QStringLiteral("app.exe")));
     PeFile root(source);
     root.parse();
-    DependencyGraph graph(root, FileSearchOptions{});
+    DependencyGraph graph(root, FileLocatorOptions{});
     const auto* rootNode = &graph.root();
     require(&rootNode->file() == &root && rootNode->dependencies().empty(),
             "Root is not borrowed before build");
@@ -113,10 +113,10 @@ private:
     std::shared_ptr<SourceState> m_state;
 };
 
-class TestSearcher final : public ModuleSearcher {
+class TestLocator final : public ModuleLocator {
 public:
     QHash<QString, std::pair<QString, std::shared_ptr<SourceState>>> modules;
-    std::optional<ResolvedModule> findModule(const QString& name) const override {
+    std::optional<LocatedModule> findModule(const QString& name) const override {
         if (name == QStringLiteral("search_error.dll")) {
             throw PeDataSourceError(PeDataSourceError::Code::Io,
                                     QStringLiteral("Injected open error"));
@@ -125,7 +125,7 @@ public:
         if (found == modules.cend()) {
             return std::nullopt;
         }
-        return ResolvedModule{found->first, std::make_unique<CountingSource>(found->second)};
+        return LocatedModule{found->first, std::make_unique<CountingSource>(found->second)};
     }
 };
 
@@ -149,8 +149,8 @@ void customSources() {
     PeFile root(source);
     root.parse();
     const auto rootReads = rootState->reads;
-    auto searcher = std::make_unique<TestSearcher>();
-    searcher->modules = {
+    auto locator = std::make_unique<TestLocator>();
+    locator->modules = {
         {QStringLiteral("root.dll"), {QStringLiteral("root"), rootState}},
         {QStringLiteral("child.dll"), {QStringLiteral("child"), child}},
         {QStringLiteral("alias.dll"), {QStringLiteral("child"), child}},
@@ -160,7 +160,7 @@ void customSources() {
         {QStringLiteral("wide_alias.dll"), {QStringLiteral("wide"), wide}},
         {QStringLiteral("read_error.dll"), {QStringLiteral("read_error"), unreadable}}};
     {
-        DependencyGraph graph(root, QStringLiteral("root"), std::move(searcher));
+        DependencyGraph graph(root, QStringLiteral("root"), std::move(locator));
         graph.build();
         const auto& childNode = resolved(graph.root(), QStringLiteral("child.dll"));
         require(&resolved(graph.root(), QStringLiteral("alias.dll")) == &childNode,
@@ -215,14 +215,14 @@ void configuredPathsAndValidation() {
     PeFileDataSource source(dir.filePath(QStringLiteral("app/app.exe")));
     PeFile root(source);
     expectException<std::invalid_argument>([&] {
-        DependencyGraph graph(root, QStringLiteral("root"), std::make_unique<TestSearcher>());
+        DependencyGraph graph(root, QStringLiteral("root"), std::make_unique<TestLocator>());
     });
     root.parse();
     expectException<std::invalid_argument>(
         [&] { DependencyGraph graph(root, QStringLiteral("root"), nullptr); });
     expectException<std::invalid_argument>(
-        [&] { DependencyGraph graph(root, QString{}, std::make_unique<TestSearcher>()); });
-    FileSearchOptions options;
+        [&] { DependencyGraph graph(root, QString{}, std::make_unique<TestLocator>()); });
+    FileLocatorOptions options;
     options.workDirectory = dir.filePath(QStringLiteral("work"));
     options.fallbackDirectories = QStringList{dir.filePath(QStringLiteral("extra"))};
     options.appDirectory = dir.filePath(QStringLiteral("incorrect_app"));
@@ -243,7 +243,7 @@ void longChain() {
     CountingSource source(rootState);
     PeFile root(source);
     root.parse();
-    auto searcher = std::make_unique<TestSearcher>();
+    auto locator = std::make_unique<TestLocator>();
     constexpr int Count = 512;
     std::vector<std::shared_ptr<SourceState>> states;
     for (int i = 0; i < Count; ++i) {
@@ -252,12 +252,12 @@ void longChain() {
             i + 1 == Count ? QStringLiteral("root.dll") : QStringLiteral("%1.dll").arg(i + 1);
         state->bytes = makePe({next});
         const auto name = QStringLiteral("%1.dll").arg(i);
-        searcher->modules.insert(name, {name, state});
+        locator->modules.insert(name, {name, state});
         states.push_back(std::move(state));
     }
-    searcher->modules.insert(QStringLiteral("root.dll"), {QStringLiteral("root"), rootState});
+    locator->modules.insert(QStringLiteral("root.dll"), {QStringLiteral("root"), rootState});
     {
-        DependencyGraph graph(root, QStringLiteral("root"), std::move(searcher));
+        DependencyGraph graph(root, QStringLiteral("root"), std::move(locator));
         graph.build();
         require(graph.moduleCount() == Count + 1, "Long dependency chain was truncated");
         const auto* node = &graph.root();

@@ -6,14 +6,14 @@
 #include <utility>
 
 namespace {
-std::unique_ptr<ModuleSearcher> fileSearcher(const PeFile& root, FileSearchOptions options) {
+std::unique_ptr<ModuleLocator> fileLocator(const PeFile& root, FileLocatorOptions options) {
     if (!root.isParsed()) {
         throw std::invalid_argument("Dependency root must already be parsed");
     }
-    const auto path = FileModuleSearcher::fileIdentity(root.dataSource().url());
+    const auto path = FileModuleLocator::fileIdentity(root.dataSource().url());
     options.appDirectory = QFileInfo(path).absolutePath();
     options.isPe32Plus = root.isPe32Plus();
-    return std::make_unique<FileModuleSearcher>(std::move(options));
+    return std::make_unique<FileModuleLocator>(std::move(options));
 }
 
 DependencyError currentError(DependencyError::Code code, const std::exception& error) {
@@ -24,7 +24,7 @@ DependencyError currentError(DependencyError::Code code, const std::exception& e
 ModuleNode::ModuleNode(QString identity, const PeFile& borrowed)
     : m_identity(std::move(identity)), m_file(&borrowed) {}
 
-ModuleNode::ModuleNode(ResolvedModule resolved)
+ModuleNode::ModuleNode(LocatedModule resolved)
     : m_identity(std::move(resolved.identity)),
       m_source(std::move(resolved.source)),
       m_ownedFile(std::make_unique<PeFile>(*m_source)),
@@ -32,25 +32,25 @@ ModuleNode::ModuleNode(ResolvedModule resolved)
     m_ownedFile->parse();
 }
 
-DependencyGraph::DependencyGraph(const PeFile& root, FileSearchOptions options)
-    : DependencyGraph(root, FileModuleSearcher::fileIdentity(root.dataSource().url()),
-                      fileSearcher(root, std::move(options))) {}
+DependencyGraph::DependencyGraph(const PeFile& root, FileLocatorOptions options)
+    : DependencyGraph(root, FileModuleLocator::fileIdentity(root.dataSource().url()),
+                      fileLocator(root, std::move(options))) {}
 
 DependencyGraph::DependencyGraph(const PeFile& root, QString rootIdentity,
-                                 std::unique_ptr<ModuleSearcher> searcher)
-    : m_searcher(std::move(searcher)) {
-    if (!root.isParsed() || rootIdentity.isEmpty() || !m_searcher) {
+                                 std::unique_ptr<ModuleLocator> locator)
+    : m_locator(std::move(locator)) {
+    if (!root.isParsed() || rootIdentity.isEmpty() || !m_locator) {
         throw std::invalid_argument(
-            "DependencyGraph requires a parsed root, identity and searcher");
+            "DependencyGraph requires a parsed root, identity and locator");
     }
     m_modules.push_back(
         std::unique_ptr<ModuleNode>(new ModuleNode(std::move(rootIdentity), root)));
 }
 
 DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
-    std::optional<ResolvedModule> found;
+    std::optional<LocatedModule> found;
     try {
-        found = m_searcher->findModule(name);
+        found = m_locator->findModule(name);
     } catch (const PeDataSourceError& error) {
         return {nullptr, currentError(DependencyError::Code::ReadError, error)};
     }
@@ -62,7 +62,7 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
                                          false}};
     }
     if (found->identity.isEmpty() || !found->source) {
-        throw std::invalid_argument("ModuleSearcher returned an empty identity or data source");
+        throw std::invalid_argument("ModuleLocator returned an empty identity or data source");
     }
     const auto cached = m_resolutions.constFind(found->identity);
     if (cached != m_resolutions.cend()) {

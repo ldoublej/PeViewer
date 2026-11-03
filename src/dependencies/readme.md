@@ -44,17 +44,17 @@ for (const auto& edge : graph.root().dependencies()) {
 根 `PeFile` 不会重新解析。所有旧的子节点、依赖边和反向依赖引用均失效。
 构建期间不要并发修改或查询同一张图，也不要重新解析其根文件。
 
-## 搜索配置
+## 定位配置
 
-`module_searcher.h` 声明通用搜索接口；文件搜索器及其配置声明在
-`file_module_searcher.h`，实现在 `file_module_searcher.cpp`。
+`module_locator.h` 声明通用定位接口；文件定位器及其配置声明在
+`file_module_locator.h`，实现在 `file_module_locator.cpp`。
 
-`FileSearchOptions::systemDefaults()` 获取本机系统目录、KnownDLLs、API Set schema
-及 PATH 的快照，是默认搜索配置。也可以从空的 `FileSearchOptions{}` 开始，显式配置
+`FileLocatorOptions::systemDefaults()` 获取本机系统目录、KnownDLLs、API Set schema
+及 PATH 的快照，是默认定位配置。也可以从空的 `FileLocatorOptions{}` 开始，显式配置
 离线分析环境；空字段不参与搜索，不会被隐式解释为查看器的当前目录。
 
 ```cpp
-auto options = FileSearchOptions::systemDefaults();
+auto options = FileLocatorOptions::systemDefaults();
 options.workDirectory = targetWorkingDirectory;
 options.fallbackDirectories.append(extraDirectory);
 DependencyGraph graph(file, options);
@@ -85,13 +85,13 @@ KnownDLLs 只使用对应系统目录，缺失时不回退到应用目录的同�
 文件搜索退回普通 DLL 名称搜索。契约匹配忽略大小写、`.dll` 和末尾 minor 版本，
 保留 major 版本；多个宿主使用第一个非空宿主，别名链最多跟随 8 步。
 
-实现 `ModuleSearcher::findModule()` 并返回 `ResolvedModule`，即可注入其他定位策略。
+实现 `ModuleLocator::findModule()` 并返回 `LocatedModule`，即可注入其他定位策略。
 返回值包含稳定身份字符串和独占所有权的数据源；同一模块的所有别名必须使用同一身份，
-根身份也须与搜索器一致。找不到返回 `std::nullopt`，打开失败可抛出 `PeDataSourceError`。
+根身份也须与定位器一致。找不到返回 `std::nullopt`，打开失败可抛出 `PeDataSourceError`。
 空身份、空数据源等接口误用抛出 `std::invalid_argument`。
 
 ```cpp
-DependencyGraph graph(file, rootIdentity, std::move(customSearcher));
+DependencyGraph graph(file, rootIdentity, std::move(customLocator));
 ```
 
 当前 C++ 解析器仅支持文件布局，因此自定义源也须提供文件布局的 PE 字节。
@@ -107,7 +107,7 @@ ctest --test-dir out/build/debug --output-on-failure
 
 - `api_set_tests`：契约名、版本、多宿主、别名链及循环，截断、溢出、无效 UTF-16，
   以及从 PE 文件读取 `.apiset`。
-- `module_searcher_tests`：完整搜索顺序、KnownDLLs 优先级、位数、显式路径、目标工作目录、
+- `module_locator_tests`：完整搜索顺序、KnownDLLs 优先级、位数、显式路径、目标工作目录、
   API Set 别名身份；Windows 上额外验证本机 schema。
 - `dependency_graph_tests`：共享与循环依赖、反向查询、缺失和无效模块、位数不匹配、
   读取失败、别名错误缓存、重新构建和数据源生命周期。

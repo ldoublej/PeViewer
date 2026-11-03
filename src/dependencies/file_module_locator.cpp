@@ -1,4 +1,4 @@
-#include "file_module_searcher.h"
+#include "file_module_locator.h"
 
 #include <pe_file_data_source.h>
 
@@ -54,8 +54,8 @@ QString queryWindowsDirectory(UINT(WINAPI* query)(LPWSTR, UINT), bool optional =
 #endif
 }  // namespace
 
-FileSearchOptions FileSearchOptions::systemDefaults() {
-    FileSearchOptions options;
+FileLocatorOptions FileLocatorOptions::systemDefaults() {
+    FileLocatorOptions options;
 #ifdef Q_OS_WIN
     options.windowsDirectory = queryWindowsDirectory(GetWindowsDirectoryW);
     options.system64Directory = queryWindowsDirectory(GetSystemDirectoryW);
@@ -87,7 +87,7 @@ FileSearchOptions FileSearchOptions::systemDefaults() {
     return options;
 }
 
-FileModuleSearcher::FileModuleSearcher(FileSearchOptions options) : m_options(std::move(options)) {
+FileModuleLocator::FileModuleLocator(FileLocatorOptions options) : m_options(std::move(options)) {
     QSet<QString> normalized;
     for (const auto& name : m_options.knownDlls) {
         normalized.insert(name.toLower());
@@ -95,7 +95,7 @@ FileModuleSearcher::FileModuleSearcher(FileSearchOptions options) : m_options(st
     m_options.knownDlls = std::move(normalized);
 }
 
-QString FileModuleSearcher::fileIdentity(const QString& path) {
+QString FileModuleLocator::fileIdentity(const QString& path) {
     auto identity = QFileInfo(path).canonicalFilePath();
     if (identity.isEmpty() || !QFileInfo(identity).isFile()) {
         throw PeDataSourceError(PeDataSourceError::Code::Io,
@@ -107,11 +107,11 @@ QString FileModuleSearcher::fileIdentity(const QString& path) {
     return identity;
 }
 
-QString FileModuleSearcher::systemDirectory() const {
+QString FileModuleLocator::systemDirectory() const {
     return m_options.isPe32Plus ? m_options.system64Directory : m_options.system32Directory;
 }
 
-QStringList FileModuleSearcher::searchDirectories() const {
+QStringList FileModuleLocator::searchDirectories() const {
     QStringList directories;
     const auto append = [&](const QString& directory) {
         if (!directory.isEmpty()) {
@@ -145,7 +145,7 @@ QStringList FileModuleSearcher::searchDirectories() const {
     return directories;
 }
 
-QString FileModuleSearcher::findModulePath(const QString& dllName) const {
+QString FileModuleLocator::findModulePath(const QString& dllName) const {
     if (dllName.isEmpty() || dllName.contains(QChar(0))) {
         return {};
     }
@@ -176,10 +176,10 @@ QString FileModuleSearcher::findModulePath(const QString& dllName) const {
     return {};
 }
 
-std::optional<ResolvedModule> FileModuleSearcher::findModule(const QString& dllName) const {
+std::optional<LocatedModule> FileModuleLocator::findModule(const QString& dllName) const {
     const auto path = findModulePath(dllName);
     if (path.isEmpty()) {
         return std::nullopt;
     }
-    return ResolvedModule{fileIdentity(path), std::make_unique<PeFileDataSource>(path)};
+    return LocatedModule{fileIdentity(path), std::make_unique<PeFileDataSource>(path)};
 }

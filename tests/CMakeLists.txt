@@ -7,7 +7,7 @@ add_executable(PeParseTests pe_parse_tests.cpp)
 target_link_libraries(PeParseTests PRIVATE parse)
 add_test(NAME PeParseTests COMMAND PeParseTests)
 
-foreach(test IN ITEMS api_set module_searcher dependency_graph)
+foreach(test IN ITEMS api_set module_locator dependency_graph)
     add_executable(${test}_tests ${test}_tests.cpp)
     target_link_libraries(${test}_tests PRIVATE dependencies)
     add_test(NAME ${test}_tests COMMAND ${test}_tests)

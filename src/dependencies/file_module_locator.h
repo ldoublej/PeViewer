@@ -5,11 +5,11 @@
 #include <QStringList>
 
 #include "api_set.h"
-#include "module_searcher.h"
+#include "module_locator.h"
 
 // Empty options provide an isolated search environment. Use systemDefaults() to
 // snapshot the local Windows directories, KnownDLLs, API Set schema and PATH.
-struct FileSearchOptions {
+struct FileLocatorOptions {
     QString appDirectory;
     QString workDirectory;
     QString system32Directory;
@@ -21,15 +21,15 @@ struct FileSearchOptions {
     ApiSetMap apiSet;
     bool isPe32Plus = sizeof(void*) == 8;
 
-    static FileSearchOptions systemDefaults();
+    static FileLocatorOptions systemDefaults();
 };
 
 // Static approximation of the default safe DLL search order. Does not load DLLs
 // or emulate SxS, .local, package dependencies or a process's loaded-module list.
-class FileModuleSearcher final : public ModuleSearcher {
+class FileModuleLocator final : public ModuleLocator {
 public:
-    explicit FileModuleSearcher(FileSearchOptions options = FileSearchOptions::systemDefaults());
-    std::optional<ResolvedModule> findModule(const QString& dllName) const override;
+    explicit FileModuleLocator(FileLocatorOptions options = FileLocatorOptions::systemDefaults());
+    std::optional<LocatedModule> findModule(const QString& dllName) const override;
     QString findModulePath(const QString& dllName) const;
 
     // Canonical absolute path; Windows identity comparisons are case-insensitive.
@@ -39,5 +39,5 @@ public:
 private:
     QString systemDirectory() const;
     QStringList searchDirectories() const;
-    FileSearchOptions m_options;
+    FileLocatorOptions m_options;
 };

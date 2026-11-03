@@ -10,7 +10,7 @@
 #include <optional>
 #include <vector>
 
-#include "file_module_searcher.h"
+#include "file_module_locator.h"
 
 class ModuleNode;
 
@@ -44,7 +44,7 @@ public:
 private:
     friend class DependencyGraph;
     ModuleNode(QString identity, const PeFile& borrowed);
-    explicit ModuleNode(ResolvedModule resolved);
+    explicit ModuleNode(LocatedModule resolved);
     QString m_identity;
     // Destruction order keeps the source alive until after its PeFile is destroyed.
     std::unique_ptr<PeDataSource> m_source;
@@ -59,10 +59,10 @@ public:
     // root must already be parsed. It and its data source must outlive the graph.
     // Application directory and target bitness are derived from root.
     explicit DependencyGraph(const PeFile& root,
-                             FileSearchOptions options = FileSearchOptions::systemDefaults());
-    // A custom searcher can supply any file-layout source, including in-memory test data.
+                             FileLocatorOptions options = FileLocatorOptions::systemDefaults());
+    // A custom locator can supply any file-layout source, including in-memory test data.
     DependencyGraph(const PeFile& root, QString rootIdentity,
-                    std::unique_ptr<ModuleSearcher> searcher);
+                    std::unique_ptr<ModuleLocator> locator);
     void build();
     const ModuleNode& root() const { return *m_modules.front(); }
     std::size_t moduleCount() const { return m_modules.size(); }
@@ -74,7 +74,7 @@ private:
         std::optional<DependencyError> error;
     };
     Resolution resolve(const QString& name);
-    std::unique_ptr<ModuleSearcher> m_searcher;
+    std::unique_ptr<ModuleLocator> m_locator;
     std::vector<std::unique_ptr<ModuleNode>> m_modules;
     QHash<QString, Resolution> m_resolutions;
 };

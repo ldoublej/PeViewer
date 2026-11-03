@@ -3,9 +3,9 @@ project(dependencies LANGUAGES CXX)
 add_library(${PROJECT_NAME} STATIC
     api_set.cpp
     api_set.h
-    file_module_searcher.cpp
-    file_module_searcher.h
-    module_searcher.h
+    file_module_locator.cpp
+    file_module_locator.h
+    module_locator.h
     dependency_graph.cpp
     dependency_graph.h
 )
