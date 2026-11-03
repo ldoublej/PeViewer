@@ -37,7 +37,7 @@ struct DependencyEdge {
 class ModuleNode {
 public:
     const QString& identity() const { return m_identity; }
-    const PeFile& file() const { return *m_file; }
+    const PeFile& pe_file() const { return *m_file; }
     const std::vector<DependencyEdge>& dependencies() const { return m_dependencies; }
     const std::vector<const ModuleNode*>& dependents() const { return m_dependents; }
 

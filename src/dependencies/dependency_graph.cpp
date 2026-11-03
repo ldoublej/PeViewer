@@ -73,8 +73,8 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
     Resolution resolution;
     try {
         std::unique_ptr<ModuleNode> module(new ModuleNode(std::move(*found)));
-        const bool expected = root().file().isPe32Plus();
-        const bool actual = module->file().isPe32Plus();
+        const bool expected = root().pe_file().isPe32Plus();
+        const bool actual = module->pe_file().isPe32Plus();
         if (expected != actual) {
             resolution.error = DependencyError{
                 DependencyError::Code::ArchitectureMismatch,
@@ -109,7 +109,7 @@ void DependencyGraph::build() {
     // caching breaks cycles and naturally merges shared dependencies and aliases.
     for (std::size_t index = 0; index < m_modules.size(); ++index) {
         auto* parent = m_modules[index].get();
-        const auto& imports = parent->file().imports();
+        const auto& imports = parent->pe_file().imports();
         parent->m_dependencies.reserve(imports.size());
         for (const auto& imported : imports) {
             const auto result = resolve(imported.dllName());
