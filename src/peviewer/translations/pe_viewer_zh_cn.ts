@@ -43,6 +43,10 @@
         <translation>文件(&amp;F)</translation>
     </message>
     <message>
+        <source>&amp;Workspace</source>
+        <translation>工作区(&amp;W)</translation>
+    </message>
+    <message>
         <location line="+36"/>
         <source>Open</source>
         <translation>打开</translation>

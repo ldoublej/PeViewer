@@ -4,7 +4,9 @@
 
 #include "ui_pe_viewer.h"
 
+class QActionGroup;
 class LanguageManager;
+class Workspace;
 
 class PeViewer : public QMainWindow {
     Q_OBJECT
@@ -21,8 +23,13 @@ private Q_SLOTS:
 
 private:
     void updateLanguageActions();
+    void addWorkspaceAction(Workspace* workspace);
+    void removeWorkspaceAction(Workspace* workspace);
+    void updateCurrentWorkspace(Workspace* workspace);
+    void updateWorkspaceStatus();
     void retranslateUi();
 
     LanguageManager& m_languageManager;
+    QActionGroup* m_workspaceActions = nullptr;
     Ui::PeViewerClass ui;
 };
