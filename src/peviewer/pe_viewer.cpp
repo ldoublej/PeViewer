@@ -9,6 +9,7 @@
 #include "dependency_graph.h"
 #include "language_manager.h"
 #include "workspace.h"
+#include "workspace_manager.h"
 
 PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     : QMainWindow(parent), m_languageManager(languageManager) {
@@ -33,8 +34,7 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
 }
 
 PeViewer::~PeViewer() {
-    // The model borrows the workspace's graph, so detach it before the manager
-    // destroys the current workspace.
+    // Detach the model from the graph owned by the singleton manager.
     ui.dependencyTree->clear();
 }
 
@@ -47,15 +47,16 @@ void PeViewer::on_actionOpen_triggered(bool b) {
 
     // Detach first; if the new file fails to open the old session is reattached.
     ui.dependencyTree->clear();
+    auto* manager = WorkspaceManager::instance();
     try {
-        Workspace* workspace = m_workspaceManager.open(fileName);
+        Workspace* workspace = manager->open(fileName);
         ui.dependencyTree->setGraph(&workspace->graph());
         ui.statusBar->showMessage(
             tr("Loaded %1: %2 modules")
                 .arg(QFileInfo(fileName).fileName())
                 .arg(static_cast<qulonglong>(workspace->graph().moduleCount())));
     } catch (const std::exception& error) {
-        if (Workspace* current = m_workspaceManager.current()) {
+        if (Workspace* current = manager->current()) {
             ui.dependencyTree->setGraph(&current->graph());
         }
         QMessageBox::warning(this, tr("Open Failed"),

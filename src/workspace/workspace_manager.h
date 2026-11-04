@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QObject>
 #include <QString>
 #include <QtGlobal>
 #include <cstddef>
@@ -8,19 +9,22 @@
 
 class Workspace;
 
-// Owns every open Workspace and tracks the active one. Opening a path that is
-// already open activates the existing workspace instead of duplicating it.
-class WorkspaceManager {
+// Singleton that owns every open Workspace and tracks the active one.
+class WorkspaceManager : public QObject {
+    Q_OBJECT
+
 public:
-    WorkspaceManager() = default;
-    ~WorkspaceManager();
+    enum class OpenMode { OpenOnly, OpenAndActivate };
+    Q_ENUM(OpenMode)
+
+    static WorkspaceManager* instance();
 
     Q_DISABLE_COPY_MOVE(WorkspaceManager)
 
-    // Constructs a new workspace, appends it and makes it current.
+    // Constructs a new workspace and appends it; activates it if requested.
     // Throws on load/parse/build failure; the existing list is left untouched.
-    // If path is already open, activates that workspace and returns it.
-    Workspace* open(const QString& path);
+    // If path is already open, reuses it and applies the requested mode.
+    Workspace* open(const QString& path, OpenMode mode = OpenMode::OpenAndActivate);
 
     Workspace* find(const QString& path) const;
     bool activate(Workspace* workspace);
@@ -35,7 +39,17 @@ public:
     bool empty() const { return m_workspaces.empty(); }
     const std::vector<std::unique_ptr<Workspace>>& workspaces() const { return m_workspaces; }
 
+signals:
+    void workspaceOpened(Workspace* workspace);
+    // Removed from the list, but still alive during synchronous delivery.
+    void workspaceClosed(Workspace* workspace);
+    // Emitted only when current() changes; nullptr means no active workspace.
+    void workspaceActivated(Workspace* workspace);
+
 private:
+    WorkspaceManager();
+    ~WorkspaceManager() override;
+
     std::vector<std::unique_ptr<Workspace>> m_workspaces;
     Workspace* m_current = nullptr;
 };

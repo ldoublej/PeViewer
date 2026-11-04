@@ -22,23 +22,31 @@ bool samePath(const QString& left, const QString& right) {
 }
 }  // namespace
 
+WorkspaceManager* WorkspaceManager::instance() {
+    static WorkspaceManager manager;
+    return &manager;
+}
+
+WorkspaceManager::WorkspaceManager() = default;
 WorkspaceManager::~WorkspaceManager() = default;
 
-Workspace* WorkspaceManager::open(const QString& path) {
-    const QString wanted = canonicalPath(path);
-    for (const auto& workspace : m_workspaces) {
-        if (samePath(canonicalPath(workspace->path()), wanted)) {
-            m_current = workspace.get();
-            return m_current;
+Workspace* WorkspaceManager::open(const QString& path, OpenMode mode) {
+    if (Workspace* workspace = find(path)) {
+        if (mode == OpenMode::OpenAndActivate) {
+            activate(workspace);
         }
+        return workspace;
     }
 
     // Build first so a failure leaves the list and current workspace intact.
     auto workspace = std::make_unique<Workspace>(path);
     Workspace* opened = workspace.get();
     m_workspaces.push_back(std::move(workspace));
-    m_current = opened;
-    return m_current;
+    emit workspaceOpened(opened);
+    if (mode == OpenMode::OpenAndActivate) {
+        activate(opened);
+    }
+    return opened;
 }
 
 Workspace* WorkspaceManager::find(const QString& path) const {
@@ -54,7 +62,10 @@ Workspace* WorkspaceManager::find(const QString& path) const {
 bool WorkspaceManager::activate(Workspace* workspace) {
     for (const auto& entry : m_workspaces) {
         if (entry.get() == workspace) {
-            m_current = workspace;
+            if (m_current != workspace) {
+                m_current = workspace;
+                emit workspaceActivated(workspace);
+            }
             return true;
         }
     }
@@ -69,17 +80,26 @@ bool WorkspaceManager::close(Workspace* workspace) {
         return false;
     }
 
-    if (m_current == workspace) {
-        m_current = nullptr;
-    }
+    const bool wasCurrent = m_current == workspace;
+    auto closing = std::move(*found);
     m_workspaces.erase(found);
-    if (!m_current && !m_workspaces.empty()) {
-        m_current = m_workspaces.back().get();
+    if (wasCurrent) {
+        m_current = m_workspaces.empty() ? nullptr : m_workspaces.back().get();
+        emit workspaceActivated(m_current);
     }
+    emit workspaceClosed(closing.get());
     return true;
 }
 
 void WorkspaceManager::closeAll() {
-    m_current = nullptr;
+    auto closing = std::move(m_workspaces);
     m_workspaces.clear();
+    const bool hadCurrent = m_current != nullptr;
+    m_current = nullptr;
+    if (hadCurrent) {
+        emit workspaceActivated(nullptr);
+    }
+    for (const auto& workspace : closing) {
+        emit workspaceClosed(workspace.get());
+    }
 }

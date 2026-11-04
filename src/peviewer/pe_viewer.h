@@ -3,7 +3,6 @@
 #include <QtWidgets/QMainWindow>
 
 #include "ui_pe_viewer.h"
-#include "workspace_manager.h"
 
 class LanguageManager;
 
@@ -25,6 +24,5 @@ private:
     void retranslateUi();
 
     LanguageManager& m_languageManager;
-    WorkspaceManager m_workspaceManager;
     Ui::PeViewerClass ui;
 };
