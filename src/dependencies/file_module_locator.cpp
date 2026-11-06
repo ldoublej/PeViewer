@@ -145,7 +145,7 @@ QStringList FileModuleLocator::searchDirectories() const {
     return directories;
 }
 
-QString FileModuleLocator::findModulePath(const QString& dllName) const {
+QString FileModuleLocator::findModulePath(const QString& dllName, const QString& importer) const {
     if (dllName.isEmpty() || dllName.contains(QChar(0))) {
         return {};
     }
@@ -159,7 +159,7 @@ QString FileModuleLocator::findModulePath(const QString& dllName) const {
                    ? QString{}
                    : existingFile(QDir(m_options.workDirectory).filePath(name));
     }
-    const auto host = m_options.apiSet.resolveHost(name);
+    const auto host = m_options.apiSet.resolveHost(name, importer);
     if (!host.isEmpty()) {
         name = host;
     }
@@ -177,9 +177,18 @@ QString FileModuleLocator::findModulePath(const QString& dllName) const {
 }
 
 std::optional<LocatedModule> FileModuleLocator::findModule(const QString& dllName) const {
-    const auto path = findModulePath(dllName);
+    return findModule(dllName, {});
+}
+
+std::optional<LocatedModule> FileModuleLocator::findModule(const QString& dllName,
+                                                          const QString& importer) const {
+    const auto path = findModulePath(dllName, importer);
     if (path.isEmpty()) {
         return std::nullopt;
     }
-    return LocatedModule{fileIdentity(path), std::make_unique<PeFileDataSource>(path)};
+    const QString name = normalizedPath(dllName);
+    const QString host = !name.contains(QLatin1Char('/')) && !name.contains(QLatin1Char(':'))
+                             ? m_options.apiSet.resolveHost(name, importer)
+                             : QString{};
+    return LocatedModule{fileIdentity(path), std::make_unique<PeFileDataSource>(path), host};
 }

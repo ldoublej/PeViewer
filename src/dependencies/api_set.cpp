@@ -100,21 +100,40 @@ QString ApiSetMap::lookupKey(QString name) {
     return name;
 }
 
-void ApiSetMap::addMapping(const QString& contract, const QString& host) {
+QString ApiSetMap::importerKey(QString name) {
+    name.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    return name.mid(name.lastIndexOf(QLatin1Char('/')) + 1).toLower();
+}
+
+void ApiSetMap::addMapping(const QString& contract, const QString& host, const QString& importer) {
     const auto key = lookupKey(contract);
-    if (!key.isEmpty() && !host.isEmpty()) {
-        m_hosts[key].append(host);
+    if (!key.isEmpty()) {
+        m_hosts[key].append({importerKey(importer), host});
     }
 }
 
-QString ApiSetMap::resolveHost(const QString& dllName) const {
+QString ApiSetMap::resolveHost(const QString& dllName, const QString& importer) const {
     auto key = lookupKey(dllName);
+    const QString importingModule = importerKey(importer);
     for (int depth = 0; depth < 8 && !key.isEmpty(); ++depth) {
         const auto found = m_hosts.constFind(key);
         if (found == m_hosts.cend() || found->isEmpty()) {
             return {};
         }
-        const auto& host = found->front();
+        const Host* selected = nullptr;
+        for (const auto& entry : *found) {
+            if (entry.importer == importingModule) {
+                selected = &entry;
+                break;
+            }
+            if (!selected && entry.importer.isEmpty()) {
+                selected = &entry;
+            }
+        }
+        if (!selected || selected->name.isEmpty()) {
+            return {};
+        }
+        const auto& host = selected->name;
         const auto next = lookupKey(host);
         if (next.isEmpty()) {
             return host;
@@ -150,14 +169,13 @@ std::optional<ApiSetMap> ApiSetMap::parse(const QByteArray& bytes) {
             for (quint32 j = 0; j < entry.valueCount; ++j) {
                 const auto value = reader.read<NamespaceValue>(entry.valueOffset +
                                                                quint64(j) * sizeof(NamespaceValue));
-                // Validate alias strings too, even though desktop lookup uses the first host.
-                reader.string(value.nameOffset, value.nameLength);
+                const auto importer = reader.string(value.nameOffset, value.nameLength);
                 const auto host = reader.string(value.valueOffset, value.valueLength);
                 if (host.contains(QLatin1Char('/')) || host.contains(QLatin1Char('\\')) ||
                     host.contains(QLatin1Char(':'))) {
                     throw InvalidSchema{};
                 }
-                map.addMapping(name, host);
+                map.addMapping(name, host, importer);
             }
         }
         return map;

@@ -17,6 +17,15 @@ add_executable(WorkspaceTests workspace_tests.cpp)
 target_link_libraries(WorkspaceTests PRIVATE workspace)
 add_test(NAME WorkspaceTests COMMAND WorkspaceTests)
 
+add_executable(DependencyTreeModelTests
+    dependency_tree_model_tests.cpp
+    ../src/peviewer/components/dependency_tree_model.cpp
+    ../src/peviewer/components/dependency_tree_model.h
+)
+target_include_directories(DependencyTreeModelTests PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
+target_link_libraries(DependencyTreeModelTests PRIVATE dependencies)
+add_test(NAME DependencyTreeModelTests COMMAND DependencyTreeModelTests)
+
 add_executable(PeViewerUiTests
     pe_viewer_ui_tests.cpp
     ../src/peviewer/pe_viewer.cpp

@@ -149,12 +149,15 @@ void DependencyTreeModel::fetchMore(const QModelIndex& parent) {
         child->name = edge.dllName;
         if (edge.module) {
             child->module = edge.module;
-            if (isAncestorModule(item, edge.module)) {
-                child->cycle = true;
+            child->detail = edge.module->identity();
+            child->cycle = isAncestorModule(item, edge.module);
+            const bool apiSet = !edge.apiSetHost.isEmpty();
+            // A contract can legitimately bind to its importing host itself.
+            // Stop expanding that reference, while retaining real multi-module cycles.
+            if (child->cycle && (!apiSet || edge.module != item->module)) {
                 child->status = Status::Cycle;
             } else {
-                child->status = Status::Resolved;
-                child->detail = edge.module->identity();
+                child->status = apiSet ? Status::ApiSet : Status::Resolved;
             }
         } else {
             child->status = edge.error ? statusForError(edge.error->code) : Status::NotFound;
@@ -187,6 +190,9 @@ QVariant DependencyTreeModel::data(const QModelIndex& index, int role) const {
                 case StatusColumn:
                     return statusText(item->status);
                 case DetailColumn:
+                    if (item->cycle && item->status == Status::ApiSet) {
+                        return tr("API Set host is the current module: %1").arg(item->detail);
+                    }
                     return item->cycle ? tr("Circular dependency") : item->detail;
                 default:
                     break;
@@ -260,6 +266,8 @@ QString DependencyTreeModel::statusText(Status status) const {
             return tr("Architecture mismatch");
         case Status::Cycle:
             return tr("Circular");
+        case Status::ApiSet:
+            return tr("API Set");
     }
     return {};
 }

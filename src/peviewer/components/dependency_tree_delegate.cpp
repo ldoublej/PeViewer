@@ -28,6 +28,7 @@ QColor statusColor(Status status, bool dark) {
         case Status::Root:
             return dark ? QColor(0x64, 0xb5, 0xf6) : QColor(0x15, 0x65, 0xc0);
         case Status::Resolved:
+        case Status::ApiSet:
             return dark ? QColor(0x81, 0xc7, 0x84) : QColor(0x2e, 0x7d, 0x32);
         case Status::Cycle:
             return dark ? QColor(0xff, 0xb7, 0x4d) : QColor(0xe6, 0x51, 0x00);

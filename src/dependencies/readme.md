@@ -90,12 +90,22 @@ KnownDLLs 只使用对应系统目录，缺失时不回退到应用目录的同�
 `ApiSetMap::parse()` 可解析离线字节，只接受已知的 version 6 布局。
 解析验证命名空间大小、数组范围和 UTF-16 字符串；不认识或损坏时返回 `std::nullopt`，
 文件搜索退回普通 DLL 名称搜索。契约匹配忽略大小写、`.dll` 和末尾 minor 版本，
-保留 major 版本；多个宿主使用第一个非空宿主，别名链最多跟随 8 步。
+保留 major 版本；多个宿主按导入者名称选择覆盖项，未命中时使用默认项（名称为空的项），
+不会使用其他导入者的专属宿主。导入者路径只取文件名并忽略大小写；别名链最多跟随 8 步，
+全程保留原导入者上下文。
+
+依赖图在定位每条导入边时传入父模块身份，并在 `DependencyEdge::apiSetHost` 中保留
+API Set 宿主名称；解析缓存仍按实际宿主身份去重，不缓存与导入者有关的契约映射。
+树界面对已映射的契约显示 `API Set` 状态。契约直接映射回当前宿主时作为终止引用显示，
+保留宿主路径，不继续展开；普通 DLL 自环以及跨模块的真实循环仍显示循环依赖。
 
 实现 `ModuleLocator::findModule()` 并返回 `LocatedModule`，即可注入其他定位策略。
-返回值包含稳定身份字符串和独占所有权的数据源；同一模块的所有别名必须使用同一身份，
+返回值包含稳定身份字符串、独占所有权的数据源及可选的 `apiSetHost`；
+同一模块的所有别名必须使用同一身份，
 根身份也须与定位器一致。找不到返回 `std::nullopt`，打开失败可抛出 `PeDataSourceError`。
 空身份、空数据源等接口误用抛出 `std::invalid_argument`。
+定位器也可重写接受 `(dllName, importer)` 的重载来使用导入者上下文；默认实现调用原来的
+单参数接口，已有自定义定位器无需修改。
 
 ```cpp
 DependencyGraph graph(file, files, rootIdentity, std::move(customLocator));
@@ -113,9 +123,10 @@ ctest --test-dir out/build/debug --output-on-failure
 ```
 
 - `api_set_tests`：契约名、版本、多宿主、别名链及循环，截断、溢出、无效 UTF-16，
-  以及从 PE 文件读取 `.apiset`。
+  按导入者覆盖与默认宿主选择，以及从 PE 文件读取 `.apiset`。
 - `module_locator_tests`：完整搜索顺序、KnownDLLs 优先级、位数、显式路径、目标工作目录、
   API Set 别名身份；Windows 上额外验证本机 schema。
 - `dependency_graph_tests`：共享与循环依赖、反向查询、缺失和无效模块、位数不匹配、
   读取失败、别名错误缓存、重新构建和数据源生命周期。
 - `pe_file_store_tests`：身份去重、稳定地址、所有权转移、失败回滚和清空行为。
+- `DependencyTreeModelTests`：API Set 导入者重定向、宿主自身引用、共享宿主及真实循环的展示。

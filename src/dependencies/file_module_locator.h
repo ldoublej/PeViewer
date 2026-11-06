@@ -30,7 +30,9 @@ class FileModuleLocator final : public ModuleLocator {
 public:
     explicit FileModuleLocator(FileLocatorOptions options = FileLocatorOptions::systemDefaults());
     std::optional<LocatedModule> findModule(const QString& dllName) const override;
-    QString findModulePath(const QString& dllName) const;
+    std::optional<LocatedModule> findModule(const QString& dllName,
+                                           const QString& importer) const override;
+    QString findModulePath(const QString& dllName, const QString& importer = {}) const;
 
     // Canonical absolute path; Windows identity comparisons are case-insensitive.
     // Missing paths throw PeDataSourceError.

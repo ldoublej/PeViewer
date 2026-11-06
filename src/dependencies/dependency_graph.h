@@ -30,6 +30,7 @@ struct DependencyEdge {
     const ModuleNode* module = nullptr;
     // Present exactly when module is null. A bad edge does not stop other modules.
     std::optional<DependencyError> error;
+    QString apiSetHost;
     bool isResolved() const { return module != nullptr; }
 };
 
@@ -73,8 +74,9 @@ private:
     struct Resolution {
         ModuleNode* module = nullptr;
         std::optional<DependencyError> error;
+        QString apiSetHost;
     };
-    Resolution resolve(const QString& name);
+    Resolution resolve(const QString& name, const QString& importer);
     // Declared before the nodes so stored files outlive every ModuleNode.
     PeFileStore& m_files;
     std::unique_ptr<ModuleLocator> m_locator;

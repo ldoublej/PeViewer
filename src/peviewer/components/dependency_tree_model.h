@@ -22,6 +22,7 @@ public:
         ParseError,
         ArchitectureMismatch,
         Cycle,
+        ApiSet,
     };
     enum Column : int { ModuleColumn = 0, StatusColumn = 1, DetailColumn = 2, ColumnCount = 3 };
     enum Role : int { StatusRole = Qt::UserRole + 1 };

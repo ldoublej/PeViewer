@@ -106,6 +106,24 @@ void tests() {
     require(FileModuleLocator(options).findModulePath(QStringLiteral("other.dll")).isEmpty(),
             "Relative PATH entry used the viewer working directory");
 
+    auto contextualOptions = options;
+    contextualOptions.apiSet.addMapping(QStringLiteral("api-test-l1-1-0"),
+                                        QStringLiteral("other.dll"), QStringLiteral("known.dll"));
+    const auto other = QDir(options.system32Directory).filePath(QStringLiteral("other.dll"));
+    writeFile(other);
+    FileModuleLocator contextualLocator(contextualOptions);
+    const auto overridden = contextualLocator.findModule(
+        QStringLiteral("api-test-l1-1-0.dll"), QStringLiteral("C:\\target\\KNOWN.DLL"));
+    require(overridden && overridden->identity == FileModuleLocator::fileIdentity(other) &&
+                overridden->apiSetHost == QStringLiteral("other.dll"),
+            "Module locator lost the importing module's API Set override");
+    const auto direct = contextualLocator.findModule(QStringLiteral("known.dll"));
+    require(direct && direct->apiSetHost.isEmpty(), "Ordinary import gained API Set metadata");
+    const auto explicitContract = contextualLocator.findModule(explicitFile,
+                                                              QStringLiteral("known.dll"));
+    require(explicitContract && explicitContract->apiSetHost.isEmpty(),
+            "Explicit path was classified as an API Set redirection");
+
 #ifdef Q_OS_WIN
     auto local = FileLocatorOptions::systemDefaults();
     const FileModuleLocator system(local);

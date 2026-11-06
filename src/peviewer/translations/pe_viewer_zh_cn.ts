@@ -60,6 +60,14 @@
 <context>
     <name>DependencyTreeModel</name>
     <message>
+        <source>API Set</source>
+        <translation>API Set</translation>
+    </message>
+    <message>
+        <source>API Set host is the current module: %1</source>
+        <translation>API Set 宿主为当前模块：%1</translation>
+    </message>
+    <message>
         <source>Module</source>
         <translation>模块</translation>
     </message>

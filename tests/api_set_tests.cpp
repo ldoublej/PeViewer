@@ -9,7 +9,13 @@
 using namespace DependencyTests;
 
 namespace {
-using Mapping = std::pair<QString, QStringList>;
+struct Host {
+    QString name;
+    QString importer;
+    Host(QString name, QString importer = {})
+        : name(std::move(name)), importer(std::move(importer)) {}
+};
+using Mapping = std::pair<QString, std::vector<Host>>;
 
 QByteArray schema(const std::vector<Mapping>& mappings) {
     int count = 0;
@@ -38,8 +44,10 @@ QByteArray schema(const std::vector<Mapping>& mappings) {
         put(bytes, entry + 16, quint32(value));
         put(bytes, entry + 20, quint32(mapping.second.size()));
         for (const auto& host : mapping.second) {
-            put(bytes, value + 12, appendString(host));
-            put(bytes, value + 16, quint32(host.size() * 2));
+            put(bytes, value + 4, appendString(host.importer));
+            put(bytes, value + 8, quint32(host.importer.size() * 2));
+            put(bytes, value + 12, appendString(host.name));
+            put(bytes, value + 16, quint32(host.name.size() * 2));
             value += 20;
         }
     }
@@ -63,11 +71,48 @@ void tests() {
     require(parsed->resolveHost(QStringLiteral("ext-ms-empty-l1-1-0.dll")).isEmpty(),
             "Empty host list resolved");
 
+    const auto contextual = ApiSetMap::parse(schema({
+        {QStringLiteral("api-ms-win-core-processthreads-l1-1-0"),
+         {Host(QStringLiteral("kernel32.dll")),
+          Host(QStringLiteral("kernelbase.dll"), QStringLiteral("kernel32.dll"))}},
+        {QStringLiteral("api-named-first-l1-1-0"),
+         {Host(QStringLiteral("private.dll"), QStringLiteral("client.dll")),
+          Host(QStringLiteral("default.dll"))}},
+        {QStringLiteral("api-named-only-l1-1-0"),
+         {Host(QStringLiteral("private.dll"), QStringLiteral("client.dll"))}},
+        {QStringLiteral("api-empty-override-l1-1-0"),
+         {Host(QStringLiteral("default.dll")), Host({}, QStringLiteral("client.dll"))}},
+    }));
+    require(contextual.has_value(), "Importer-specific schema was rejected");
+    const auto contract = QStringLiteral("api-ms-win-core-processthreads-l1-1-0.dll");
+    require(contextual->resolveHost(contract) == QStringLiteral("kernel32.dll") &&
+                contextual->resolveHost(contract, QStringLiteral("app.exe")) ==
+                    QStringLiteral("kernel32.dll"),
+            "Unrelated importer did not use the default host");
+    require(contextual->resolveHost(contract, QStringLiteral("C:\\Windows\\System32\\KERNEL32.DLL")) ==
+                QStringLiteral("kernelbase.dll"),
+            "Importer override was discarded, creating a false kernel32 self-reference");
+    require(contextual->resolveHost(QStringLiteral("api-named-first-l1-1-0.dll")) ==
+                QStringLiteral("default.dll"),
+            "Default host depended on schema value order");
+    require(contextual->resolveHost(QStringLiteral("api-named-only-l1-1-0.dll")).isEmpty() &&
+                contextual->resolveHost(QStringLiteral("api-named-only-l1-1-0.dll"),
+                                        QStringLiteral("client.dll")) == QStringLiteral("private.dll"),
+            "A named host was used for an unrelated importer");
+    require(contextual->resolveHost(QStringLiteral("api-empty-override-l1-1-0.dll"),
+                                    QStringLiteral("client.dll")).isEmpty(),
+            "Empty importer-specific host fell back to the default host");
+
     ApiSetMap chain;
     chain.addMapping(QStringLiteral("api-first-l1-1-0"), QStringLiteral("ext-second-l1-1-0"));
     chain.addMapping(QStringLiteral("ext-second-l1-1-0"), QStringLiteral("host.dll"));
     require(chain.resolveHost(QStringLiteral("api-first-l1-1-2.dll")) == QStringLiteral("host.dll"),
             "API Set alias chain failed");
+    chain.addMapping(QStringLiteral("ext-second-l1-1-0"), QStringLiteral("override.dll"),
+                     QStringLiteral("client.dll"));
+    require(chain.resolveHost(QStringLiteral("api-first-l1-1-2.dll"),
+                              QStringLiteral("client.dll")) == QStringLiteral("override.dll"),
+            "API Set alias chain lost the original importer");
     ApiSetMap cycle;
     cycle.addMapping(QStringLiteral("api-a"), QStringLiteral("api-b"));
     cycle.addMapping(QStringLiteral("api-b"), QStringLiteral("api-a"));

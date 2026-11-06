@@ -40,10 +40,10 @@ DependencyGraph::DependencyGraph(const PeFile& root, PeFileStore& files, QString
         std::unique_ptr<ModuleNode>(new ModuleNode(std::move(rootIdentity), root)));
 }
 
-DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
+DependencyGraph::Resolution DependencyGraph::resolve(const QString& name, const QString& importer) {
     std::optional<LocatedModule> found;
     try {
-        found = m_locator->findModule(name);
+        found = m_locator->findModule(name, importer);
     } catch (const PeDataSourceError& error) {
         return {nullptr, currentError(DependencyError::Code::ReadError, error)};
     }
@@ -59,7 +59,9 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
     }
     const auto cached = m_resolutions.constFind(found->identity);
     if (cached != m_resolutions.cend()) {
-        return *cached;
+        auto resolution = *cached;
+        resolution.apiSetHost = found->apiSetHost;
+        return resolution;
     }
 
     const auto identity = found->identity;
@@ -88,6 +90,8 @@ DependencyGraph::Resolution DependencyGraph::resolve(const QString& name) {
         resolution.error = currentError(DependencyError::Code::ReadError, error);
     }
     m_resolutions.insert(identity, resolution);
+    // Resolution metadata belongs to this import edge, not the shared module.
+    resolution.apiSetHost = found->apiSetHost;
     return resolution;
 }
 
@@ -109,8 +113,9 @@ void DependencyGraph::build() {
         const auto& imports = parent->pe_file().imports();
         parent->m_dependencies.reserve(imports.size());
         for (const auto& imported : imports) {
-            const auto result = resolve(imported.dllName());
-            parent->m_dependencies.push_back({imported.dllName(), result.module, result.error});
+            const auto result = resolve(imported.dllName(), parent->identity());
+            parent->m_dependencies.push_back(
+                {imported.dllName(), result.module, result.error, result.apiSetHost});
             if (result.module) {
                 auto& dependents = result.module->m_dependents;
                 if (std::find(dependents.begin(), dependents.end(), parent) == dependents.end()) {
