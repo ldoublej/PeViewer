@@ -68,6 +68,11 @@ void PeViewer::on_actionOpen_triggered(bool b) {
     }
 }
 
+void PeViewer::on_actionClose_triggered() {
+    auto* manager = WorkspaceManager::instance();
+    manager->close(manager->current());
+}
+
 void PeViewer::changeEvent(QEvent* event) {
     QMainWindow::changeEvent(event);
     if (event->type() == QEvent::LanguageChange) {
@@ -109,6 +114,7 @@ void PeViewer::removeWorkspaceAction(Workspace* workspace) {
 }
 
 void PeViewer::updateCurrentWorkspace(Workspace* workspace) {
+    ui.actionClose->setEnabled(workspace != nullptr);
     for (auto* action : m_workspaceActions->actions()) {
         action->setChecked(workspace && action->data().toString() == workspace->path());
     }

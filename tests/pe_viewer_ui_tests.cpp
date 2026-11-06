@@ -110,21 +110,23 @@ void testWorkspaceMenu() {
     auto* manager = WorkspaceManager::instance();
     auto* menu = window.findChild<QMenu*>(QStringLiteral("menuWorkspace"));
     auto* tree = window.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
-    require(menu && tree && window.menuBar()->actions().contains(menu->menuAction()),
+    auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
+    require(menu && tree && closeAction && window.menuBar()->actions().contains(menu->menuAction()),
             "Workspace menu or dependency tree is missing");
     require(menu->actions().isEmpty() && !menu->isEnabled(), "Empty workspace menu is enabled");
+    require(!closeAction->isEnabled(), "Close is enabled without a current workspace");
 
     Workspace* first = manager->open(firstPath, WorkspaceManager::OpenMode::OpenOnly);
     require(menu->isEnabled() && menu->actions().size() == 1, "Opened workspace is not listed");
     auto* firstAction = menu->actions().first();
-    require(firstAction->isCheckable() && !firstAction->isChecked() &&
+    require(firstAction->isCheckable() && !firstAction->isChecked() && !closeAction->isEnabled() &&
                 tree->model()->rowCount() == 0,
             "OpenOnly selected or displayed a workspace");
     require(firstAction->data().toString() == firstPath &&
                 firstAction->text() == QDir::toNativeSeparators(firstPath).replace('&', "&&"),
             "Workspace path is missing or its mnemonic is not escaped");
     firstAction->trigger();
-    require(manager->current() == first && firstAction->isChecked() &&
+    require(manager->current() == first && firstAction->isChecked() && closeAction->isEnabled() &&
                 tree->model()->index(0, 2).data().toString() == firstIdentity,
             "Selecting the workspace did not activate and display it");
     require(window.statusBar()->currentMessage() == QStringLiteral("Loaded app.exe: 1 modules"),
@@ -166,8 +168,9 @@ void testWorkspaceMenu() {
                 window.statusBar()->currentMessage() == QStringLiteral("已加载 app.exe：1 个模块"),
             "Language switching lost the active workspace or its translated status");
 
-    require(manager->close(second), "Could not close the current workspace");
-    require(menu->actions().size() == 1 && firstAction->isChecked() &&
+    closeAction->trigger();
+    require(manager->current() == first && menu->actions().size() == 1 &&
+                firstAction->isChecked() && closeAction->isEnabled() &&
                 tree->model()->index(0, 2).data().toString() == firstIdentity,
             "Closing the current workspace did not remove its action and display the fallback");
     second = manager->open(secondPath, WorkspaceManager::OpenMode::OpenOnly);
@@ -178,9 +181,17 @@ void testWorkspaceMenu() {
             "Closing an inactive workspace did not preserve the menu selection");
     manager->open(secondPath, WorkspaceManager::OpenMode::OpenOnly);
     manager->closeAll();
-    require(menu->actions().isEmpty() && !menu->isEnabled() && tree->model()->rowCount() == 0 &&
+    require(menu->actions().isEmpty() && !menu->isEnabled() && !closeAction->isEnabled() &&
+                tree->model()->rowCount() == 0 &&
                 window.statusBar()->currentMessage() == QStringLiteral("就绪"),
             "Closing all workspaces did not clear the menu and dependency tree");
+    manager->open(firstPath);
+    require(closeAction->isEnabled(), "Opening a workspace did not reenable Close");
+    closeAction->trigger();
+    require(manager->empty() && manager->current() == nullptr && !closeAction->isEnabled() &&
+                menu->actions().isEmpty() && !menu->isEnabled() && tree->model()->rowCount() == 0 &&
+                window.statusBar()->currentMessage() == QStringLiteral("就绪"),
+            "Close did not clear the final workspace and disable itself");
     QSettings().remove(QStringLiteral("ui/language"));
 }
 }  // namespace

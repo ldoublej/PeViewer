@@ -20,6 +20,7 @@ protected:
 
 private Q_SLOTS:
     void on_actionOpen_triggered(bool b);
+    void on_actionClose_triggered();
 
 private:
     void updateLanguageActions();
