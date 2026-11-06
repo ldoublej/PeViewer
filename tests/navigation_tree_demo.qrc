@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/navigation-demo/icons">
+        <file alias="file-code.svg">resources/navigation_icons/file-code.svg</file>
+        <file alias="code.svg">resources/navigation_icons/code.svg</file>
+        <file alias="list.svg">resources/navigation_icons/list.svg</file>
+        <file alias="list-tree.svg">resources/navigation_icons/list-tree.svg</file>
+        <file alias="folder-tree.svg">resources/navigation_icons/folder-tree.svg</file>
+        <file alias="layers.svg">resources/navigation_icons/layers.svg</file>
+        <file alias="arrow-down-to-line.svg">resources/navigation_icons/arrow-down-to-line.svg</file>
+        <file alias="arrow-up-from-line.svg">resources/navigation_icons/arrow-up-from-line.svg</file>
+    </qresource>
+</RCC>

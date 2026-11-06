@@ -40,3 +40,14 @@ target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets workspace)
 add_dependencies(PeViewerUiTests peviewer_translations)
 add_test(NAME PeViewerUiTests COMMAND PeViewerUiTests)
 set_tests_properties(PeViewerUiTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Interactive visual preview; not registered with CTest because it runs an event loop.
+add_executable(NavigationTreeDemo
+    navigation_tree_demo.cpp
+    navigation_tree_demo.qrc
+    ../src/peviewer/components/navigation_tree_widget.cpp
+    ../src/peviewer/components/navigation_tree_widget.h
+)
+set_target_properties(NavigationTreeDemo PROPERTIES AUTORCC ON WIN32_EXECUTABLE TRUE)
+target_include_directories(NavigationTreeDemo PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
+target_link_libraries(NavigationTreeDemo PRIVATE Qt::Widgets)
