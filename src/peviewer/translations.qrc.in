@@ -1,0 +1,4 @@
+<RCC>
+    <qresource prefix="/i18n">
+@TRANSLATION_RESOURCE_ENTRIES@    </qresource>
+</RCC>
