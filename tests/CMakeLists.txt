@@ -26,6 +26,16 @@ target_include_directories(DependencyTreeModelTests PRIVATE "${PROJECT_SOURCE_DI
 target_link_libraries(DependencyTreeModelTests PRIVATE dependencies)
 add_test(NAME DependencyTreeModelTests COMMAND DependencyTreeModelTests)
 
+add_executable(DependencyTreeViewTests
+    dependency_tree_view_tests.cpp
+    ../src/peviewer/components/dependency_tree_view.cpp
+    ../src/peviewer/components/dependency_tree_view.h
+)
+target_include_directories(DependencyTreeViewTests PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
+target_link_libraries(DependencyTreeViewTests PRIVATE Qt::Widgets)
+add_test(NAME DependencyTreeViewTests COMMAND DependencyTreeViewTests)
+set_tests_properties(DependencyTreeViewTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(PeViewerUiTests
     pe_viewer_ui_tests.cpp
     ../src/peviewer/pe_viewer.cpp

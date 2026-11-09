@@ -2,20 +2,14 @@
 
 #include <QModelIndex>
 #include <QPainter>
+#include <QStyle>
+#include <QStyleOption>
 #include <QVector>
 
 namespace {
 bool hasSiblingAfter(const QModelIndex& index) {
     return index.isValid() && index.model() &&
            index.row() + 1 < index.model()->rowCount(index.parent());
-}
-
-int depthOf(const QModelIndex& index) {
-    int depth = 0;
-    for (QModelIndex parent = index.parent(); parent.isValid(); parent = parent.parent()) {
-        ++depth;
-    }
-    return depth;
 }
 }  // namespace
 
@@ -28,22 +22,29 @@ void DependencyTreeView::drawBranches(QPainter* painter, const QRect& rect,
         return;
     }
 
-    // Nodes from the outermost ancestor down to the item, so each level knows
-    // whether its line has to continue below this row.
+    // 从最外层祖先到当前节点；可见列数由 Qt 提供的分支区域决定。
     QVector<QModelIndex> path;
-    const int level = depthOf(index);
-    path.reserve(level + 1);
     for (QModelIndex node = index; node.isValid(); node = node.parent()) {
         path.prepend(node);
     }
 
     const int indent = indentation();
+    const int columns = qMin(path.size(), rect.width() / indent);
+    if (columns == 0) {
+        return;
+    }
+    const int firstNode = path.size() - columns;
     const qreal halfIndent = indent / 2.0;
     const qreal centerY = rect.top() + rect.height() / 2.0;
-    const qreal left = rect.left();
-    const qreal right = rect.right();
     const qreal top = rect.top();
     const qreal bottom = rect.bottom();
+    const bool rtl = isRightToLeft();
+    const bool hasChildren = index.model()->hasChildren(index);
+    const auto columnX = [&](int column) {
+        return rtl ? rect.right() - column * indent - halfIndent
+                   : rect.left() + column * indent + halfIndent;
+    };
+    const qreal itemEdge = rtl ? rect.left() : rect.right();
 
     QColor lineColor = palette().color(QPalette::Text);
     lineColor.setAlpha(90);
@@ -51,36 +52,47 @@ void DependencyTreeView::drawBranches(QPainter* painter, const QRect& rect,
     pen.setDashPattern({2, 3});
 
     painter->save();
+    painter->setClipRect(rect, Qt::IntersectClip);
     painter->setRenderHint(QPainter::Antialiasing, false);
     painter->setPen(pen);
 
-    // Ancestor columns: keep the vertical line going while a later sibling
-    // exists, and always bring the parent's line down to this row's center.
-    for (int i = 0; i < level; ++i) {
-        const bool parentLevel = i == level - 1;
-        const bool continued = hasSiblingAfter(path.at(i));
+    // 看通向当前行的下一层节点是否还有同级节点，决定祖先竖线是否继续。
+    for (int i = 0; i < columns - 1; ++i) {
+        const bool parentLevel = i == columns - 2;
+        const bool continued = hasSiblingAfter(path.at(firstNode + i + 1));
         if (!parentLevel && !continued) {
             continue;
         }
-        const qreal x = left + i * indent + halfIndent;
+        const qreal x = columnX(i);
         const qreal lineBottom = continued ? bottom : centerY;
         painter->drawLine(QPointF(x, top), QPointF(x, lineBottom));
     }
 
-    // Horizontal connector from the parent column to the item.
-    if (level > 0) {
-        const qreal x = left + (level - 1) * indent + halfIndent;
-        painter->drawLine(QPointF(x, centerY), QPointF(right, centerY));
+    // 从父级所在列连接到当前条目；无根装饰时使用当前列。
+    if (path.size() > 1) {
+        const qreal x = columnX(qMax(0, columns - 2));
+        painter->drawLine(QPointF(x, centerY), QPointF(itemEdge, centerY));
     }
 
-    // The item's own column only continues downward while its children show.
-    if (index.model()->hasChildren(index) && isExpanded(index)) {
-        const qreal x = left + level * indent + halfIndent;
+    // 展开的节点向下连接其子节点。
+    if (hasChildren && isExpanded(index)) {
+        const qreal x = columnX(columns - 1);
         painter->drawLine(QPointF(x, centerY), QPointF(x, bottom));
     }
 
+    // 仅绘制展开控件，避免 Qt 再叠加一套原生连接线。
+    if (hasChildren) {
+        QStyleOption option;
+        option.initFrom(this);
+        option.rect = QRect(qRound(columnX(columns - 1)) - 4, qRound(centerY) - 4, 9, 9);
+        option.state &= ~(QStyle::State_Item | QStyle::State_Sibling |
+                          QStyle::State_Selected | QStyle::State_MouseOver |
+                          QStyle::State_HasFocus);
+        option.state |= QStyle::State_Children;
+        if (isExpanded(index)) {
+            option.state |= QStyle::State_Open;
+        }
+        style()->drawPrimitive(QStyle::PE_IndicatorBranch, &option, painter, this);
+    }
     painter->restore();
-
-    // Draw the expand/collapse arrows on top of the connector lines.
-    QTreeView::drawBranches(painter, rect, index);
 }

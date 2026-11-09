@@ -2,8 +2,7 @@
 
 #include <QTreeView>
 
-// QTreeView that connects parent and child rows with dashed branch lines.
-// Expansion arrows are still drawn by the base class, on top of the lines.
+// 使用虚线连接依赖节点，并单独绘制展开控件。
 class DependencyTreeView : public QTreeView {
     Q_OBJECT
 
