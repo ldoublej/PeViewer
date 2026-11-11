@@ -44,18 +44,23 @@ DependencyTreeWidget::DependencyTreeWidget(QWidget* parent)
     header->setSectionsMovable(false);
     header->setStretchLastSection(false);
     header->setSectionResizeMode(DependencyTreeModel::ModuleColumn, QHeaderView::Interactive);
-    header->setSectionResizeMode(DependencyTreeModel::StatusColumn, QHeaderView::ResizeToContents);
+    header->setSectionResizeMode(DependencyTreeModel::StatusColumn, QHeaderView::Interactive);
     header->setSectionResizeMode(DependencyTreeModel::DetailColumn, QHeaderView::Stretch);
     header->setMinimumSectionSize(48);
     m_view->setColumnWidth(DependencyTreeModel::ModuleColumn, 300);
+    m_view->setColumnWidth(DependencyTreeModel::StatusColumn, 180);
 
-    // A thin separator under the header separates it from the rows; the palette
-    // role keeps the line readable in both light and dark themes.
+    // Thin separators under and between header sections; palette roles keep the
+    // lines readable in both light and dark themes.
     header->setStyleSheet(QStringLiteral(
         "QHeaderView::section {"
         " border: none;"
         " border-bottom: 1px solid palette(mid);"
+        " border-right: 1px solid palette(mid);"
         " padding: 2px 6px;"
+        "}"
+        "QHeaderView::section:last {"
+        " border-right: none;"
         "}"));
 
     connect(m_view, &QTreeView::expanded, m_model, [this](const QModelIndex& index) {
