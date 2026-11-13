@@ -12,7 +12,8 @@ Qt 安装需要包含 Widgets、Svg、LinguistTools，以及 QWindowKit 使用�
 
 仅支持小端平台，整数和 UTF-16 代码单元直接按本机布局读取。
 
-界面支持简体中文和英文。在“语言 / Language”菜单中切换后立即生效，
+主窗口使用 SARibbon，“主页 / Home”中包含文件、工作区和语言分组。
+在语言分组中切换简体中文和英文后立即生效，
 并自动保存选择；首次启动时，中文系统使用简体中文，其他系统使用英文。
 
 翻译文件位于 `src/peviewer/translations/`。构建时，Qt Linguist 的 `lrelease`
@@ -34,7 +35,7 @@ cmake --build out/build/debug
 `.ui` 中的界面文本默认可翻译；C++ 中的界面文本使用 `tr("Text")`。
 需要随语言切换刷新的 C++ 文本放在 `PeViewer::retranslateUi()` 中。
 新增语言时，在 `src/peviewer/CMakeLists.txt` 的 `TS_FILES`、`LanguageManager`
-及语言菜单中注册对应语言。
+及语言分组中注册对应语言。
 
 ## clang-tidy
 

@@ -1,13 +1,18 @@
 #include <QAction>
 #include <QApplication>
 #include <QDir>
+#include <QFile>
 #include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
 #include <QSettings>
 #include <QStatusBar>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QTreeView>
+#include <SARibbonBar.h>
+#include <SARibbonCategory.h>
+#include <SARibbonPanel.h>
 #include <iostream>
 #include <stdexcept>
 
@@ -30,14 +35,30 @@ void testLanguageSwitching() {
         LanguageManager languages;
         require(languages.language() == QStringLiteral("en"), "English preference not loaded");
         PeViewer window(languages);
-        auto* menu = window.findChild<QMenu*>(QStringLiteral("menuLanguage"));
+        auto* languagePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonLanguage"));
+        auto* filePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonFile"));
+        auto* workspacePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonWorkspace"));
+        auto* home = window.findChild<SARibbonCategory*>(QStringLiteral("ribbonHome"));
         auto* workspaceMenu = window.findChild<QMenu*>(QStringLiteral("menuWorkspace"));
         auto* english = window.findChild<QAction*>(QStringLiteral("actionEnglish"));
         auto* chinese = window.findChild<QAction*>(QStringLiteral("actionSimplifiedChinese"));
-        require(menu && workspaceMenu && english && chinese, "Language menu is incomplete");
-        require(menu->title() == QStringLiteral("&Language"), "English menu is incorrect");
-        require(workspaceMenu->title() == QStringLiteral("&Workspace"),
-                "English workspace menu is incorrect");
+        require(languagePanel && filePanel && workspacePanel && home && workspaceMenu && english &&
+                    chinese && window.menuWidget() == window.ribbonBar(),
+                "Ribbon is incomplete or not installed as the menu widget");
+        const auto menuBars = window.findChildren<QMenuBar*>();
+        require(menuBars.size() == 1 && menuBars.first() == window.ribbonBar() &&
+                    QFile::exists(QStringLiteral(":/SARibbonTheme/resource/theme-base.qss")),
+                "Traditional menu bar remains or static Ribbon resources are missing");
+        require(languagePanel->actionToRibbonToolButton(english) &&
+                    languagePanel->actionToRibbonToolButton(chinese),
+                "Language actions are missing from the Ribbon");
+        require(home->categoryName() == QStringLiteral("Home") &&
+                    filePanel->panelName() == QStringLiteral("File") &&
+                    workspacePanel->panelName() == QStringLiteral("Workspace") &&
+                    languagePanel->panelName() == QStringLiteral("Language"),
+                "English Ribbon labels are incorrect");
+        require(workspaceMenu->title() == QStringLiteral("Switch workspace"),
+                "English workspace button is incorrect");
         require(window.statusBar()->currentMessage() == QStringLiteral("Ready"),
                 "English status is incorrect");
         require(english->isChecked() && !chinese->isChecked(), "English selection is incorrect");
@@ -46,16 +67,21 @@ void testLanguageSwitching() {
         QApplication::processEvents();
         require(languages.language() == QStringLiteral("zh_CN"),
                 "Chinese action did not switch language");
-        require(menu->title() == QStringLiteral("语言(&L)"), "Designer UI was not retranslated");
-        require(workspaceMenu->title() == QStringLiteral("工作区(&W)"),
-                "Workspace menu was not retranslated");
+        require(home->categoryName() == QStringLiteral("主页") &&
+                    filePanel->panelName() == QStringLiteral("文件") &&
+                    workspacePanel->panelName() == QStringLiteral("工作区") &&
+                    languagePanel->panelName() == QStringLiteral("语言"),
+                "Ribbon labels were not retranslated");
+        require(workspaceMenu->title() == QStringLiteral("切换工作区"),
+                "Workspace button was not retranslated");
         require(window.statusBar()->currentMessage() == QStringLiteral("就绪"),
                 "C++ text was not retranslated");
         require(chinese->isChecked() && !english->isChecked(), "Chinese selection is incorrect");
 
         english->trigger();
         QApplication::processEvents();
-        require(menu->title() == QStringLiteral("&Language"), "Switching back to English failed");
+        require(languagePanel->panelName() == QStringLiteral("Language"),
+                "Switching back to English failed");
         require(window.statusBar()->currentMessage() == QStringLiteral("Ready"),
                 "English status was not restored");
 
@@ -65,7 +91,7 @@ void testLanguageSwitching() {
                 "Unsupported language accepted");
         require(languages.language() == QStringLiteral("zh_CN"),
                 "Invalid language changed selection");
-        require(menu->title() == QStringLiteral("语言(&L)"),
+        require(languagePanel->panelName() == QStringLiteral("语言"),
                 "Invalid language replaced translation");
         require(
             QSettings().value(QStringLiteral("ui/language")).toString() == QStringLiteral("zh_CN"),
@@ -111,13 +137,27 @@ void testWorkspaceMenu() {
     auto* menu = window.findChild<QMenu*>(QStringLiteral("menuWorkspace"));
     auto* tree = window.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
     auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
-    require(menu && tree && closeAction && window.menuBar()->actions().contains(menu->menuAction()),
-            "Workspace menu or dependency tree is missing");
+    auto* workspacePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonWorkspace"));
+    auto* filePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonFile"));
+    auto* openAction = window.findChild<QAction*>(QStringLiteral("actionOpen"));
+    require(menu && tree && closeAction && openAction && workspacePanel && filePanel,
+            "Workspace Ribbon or dependency tree is missing");
+    auto* workspaceButton = workspacePanel->actionToRibbonToolButton(menu->menuAction());
+    auto* closeButton = filePanel->actionToRibbonToolButton(closeAction);
+    require(workspaceButton && closeButton && filePanel->actionToRibbonToolButton(openAction),
+            "File or workspace Ribbon buttons are missing");
+    require(workspaceButton->defaultAction()->menu() == menu,
+            "Workspace Ribbon action is not connected to its menu");
+    require(workspaceButton->popupMode() == QToolButton::InstantPopup,
+            "Workspace Ribbon button does not open its menu directly");
     require(menu->actions().isEmpty() && !menu->isEnabled(), "Empty workspace menu is enabled");
     require(!closeAction->isEnabled(), "Close is enabled without a current workspace");
+    require(!workspaceButton->isEnabled() && !closeButton->isEnabled(),
+            "Ribbon buttons are enabled without an open workspace");
 
     Workspace* first = manager->open(firstPath, WorkspaceManager::OpenMode::OpenOnly);
     require(menu->isEnabled() && menu->actions().size() == 1, "Opened workspace is not listed");
+    require(workspaceButton->isEnabled(), "Workspace Ribbon button did not become enabled");
     auto* firstAction = menu->actions().first();
     require(firstAction->isCheckable() && !firstAction->isChecked() && !closeAction->isEnabled() &&
                 tree->model()->rowCount() == 0,
@@ -125,7 +165,16 @@ void testWorkspaceMenu() {
     require(firstAction->data().toString() == firstPath &&
                 firstAction->text() == QDir::toNativeSeparators(firstPath).replace('&', "&&"),
             "Workspace path is missing or its mnemonic is not escaped");
-    firstAction->trigger();
+    bool workspacePopupShown = false;
+    QTimer::singleShot(0, menu, [&] {
+        workspacePopupShown = menu->isVisible();
+        if (workspacePopupShown) {
+            firstAction->trigger();
+            menu->close();
+        }
+    });
+    workspaceButton->showMenu();
+    require(workspacePopupShown, "Workspace Ribbon button did not open its popup menu");
     require(manager->current() == first && firstAction->isChecked() && closeAction->isEnabled() &&
                 tree->model()->index(0, 2).data().toString() == firstIdentity,
             "Selecting the workspace did not activate and display it");
@@ -164,11 +213,11 @@ void testWorkspaceMenu() {
 
     require(languages.setLanguage(QStringLiteral("zh_CN")), "Could not switch to Chinese");
     QApplication::processEvents();
-    require(menu->title() == QStringLiteral("工作区(&W)") && secondAction->isChecked() &&
+    require(menu->title() == QStringLiteral("切换工作区") && secondAction->isChecked() &&
                 window.statusBar()->currentMessage() == QStringLiteral("已加载 app.exe：1 个模块"),
             "Language switching lost the active workspace or its translated status");
 
-    closeAction->trigger();
+    closeButton->click();
     require(manager->current() == first && menu->actions().size() == 1 &&
                 firstAction->isChecked() && closeAction->isEnabled() &&
                 tree->model()->index(0, 2).data().toString() == firstIdentity,
@@ -198,6 +247,7 @@ void testWorkspaceMenu() {
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+    Q_INIT_RESOURCE(SARibbonResource);
     QCoreApplication::setOrganizationName(QStringLiteral("PeViewerTests"));
     QCoreApplication::setApplicationName(QStringLiteral("UiTranslations"));
     QTemporaryDir settingsDirectory;

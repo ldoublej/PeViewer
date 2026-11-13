@@ -6,6 +6,12 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QMenu>
+#include <QStyle>
+
+#include <SARibbonBar.h>
+#include <SARibbonCategory.h>
+#include <SARibbonPanel.h>
 
 #include "dependency_graph.h"
 #include "language_manager.h"
@@ -13,8 +19,9 @@
 #include "workspace_manager.h"
 
 PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
-    : QMainWindow(parent), m_languageManager(languageManager) {
+    : SARibbonMainWindow(parent), m_languageManager(languageManager) {
     ui.setupUi(this);
+    setupRibbon();
     auto* languageActions = new QActionGroup(this);
     languageActions->setExclusive(true);
     languageActions->addAction(ui.actionEnglish);
@@ -40,7 +47,7 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     for (const auto& workspace : manager->workspaces()) {
         addWorkspaceAction(workspace.get());
     }
-    ui.menuWorkspace->setEnabled(!manager->empty());
+    m_workspaceMenu->setEnabled(!manager->empty());
     updateCurrentWorkspace(manager->current());
     retranslateUi();
     updateLanguageActions();
@@ -49,6 +56,34 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
 PeViewer::~PeViewer() {
     // Detach the model from the graph owned by the singleton manager.
     ui.dependencyTree->clear();
+}
+
+void PeViewer::setupRibbon() {
+    auto* ribbon = ribbonBar();
+    ribbon->setObjectName(QStringLiteral("ribbonBar"));
+    ribbon->setRibbonStyle(SARibbonBar::RibbonStyleLooseTwoRow);
+    ribbon->setApplicationButton(nullptr);
+
+    m_homeCategory = ribbon->addCategoryPage(tr("Home"));
+    m_homeCategory->setObjectName(QStringLiteral("ribbonHome"));
+    m_filePanel = m_homeCategory->addPanel(tr("File"));
+    m_filePanel->setObjectName(QStringLiteral("ribbonFile"));
+    ui.actionOpen->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+    ui.actionClose->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
+    m_filePanel->addLargeAction(ui.actionOpen);
+    m_filePanel->addLargeAction(ui.actionClose);
+
+    m_workspacePanel = m_homeCategory->addPanel(tr("Workspace"));
+    m_workspacePanel->setObjectName(QStringLiteral("ribbonWorkspace"));
+    m_workspaceMenu = new QMenu(tr("Switch workspace"), this);
+    m_workspaceMenu->setObjectName(QStringLiteral("menuWorkspace"));
+    m_workspaceMenu->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
+    m_workspacePanel->addLargeMenu(m_workspaceMenu);
+
+    m_languagePanel = m_homeCategory->addPanel(tr("Language"));
+    m_languagePanel->setObjectName(QStringLiteral("ribbonLanguage"));
+    m_languagePanel->addSmallAction(ui.actionEnglish);
+    m_languagePanel->addSmallAction(ui.actionSimplifiedChinese);
 }
 
 void PeViewer::on_actionOpen_triggered(bool b) {
@@ -74,7 +109,7 @@ void PeViewer::on_actionClose_triggered() {
 }
 
 void PeViewer::changeEvent(QEvent* event) {
-    QMainWindow::changeEvent(event);
+    SARibbonMainWindow::changeEvent(event);
     if (event->type() == QEvent::LanguageChange) {
         retranslateUi();
     }
@@ -82,13 +117,18 @@ void PeViewer::changeEvent(QEvent* event) {
 
 void PeViewer::retranslateUi() {
     ui.retranslateUi(this);
+    m_homeCategory->setCategoryName(tr("Home"));
+    m_filePanel->setPanelName(tr("File"));
+    m_workspacePanel->setPanelName(tr("Workspace"));
+    m_workspaceMenu->setTitle(tr("Switch workspace"));
+    m_languagePanel->setPanelName(tr("Language"));
     updateWorkspaceStatus();
 }
 
 void PeViewer::addWorkspaceAction(Workspace* workspace) {
     const QString path = workspace->path();
     const QString displayPath = QDir::toNativeSeparators(path);
-    auto* action = ui.menuWorkspace->addAction(QString(displayPath).replace('&', "&&"));
+    auto* action = m_workspaceMenu->addAction(QString(displayPath).replace('&', "&&"));
     action->setToolTip(displayPath);
     action->setData(path);
     action->setCheckable(true);
@@ -98,19 +138,19 @@ void PeViewer::addWorkspaceAction(Workspace* workspace) {
         auto* manager = WorkspaceManager::instance();
         manager->activate(manager->find(path));
     });
-    ui.menuWorkspace->setEnabled(true);
+    m_workspaceMenu->setEnabled(true);
 }
 
 void PeViewer::removeWorkspaceAction(Workspace* workspace) {
     for (auto* action : m_workspaceActions->actions()) {
         if (action->data().toString() == workspace->path()) {
             m_workspaceActions->removeAction(action);
-            ui.menuWorkspace->removeAction(action);
+            m_workspaceMenu->removeAction(action);
             action->deleteLater();
             break;
         }
     }
-    ui.menuWorkspace->setEnabled(!WorkspaceManager::instance()->empty());
+    m_workspaceMenu->setEnabled(!WorkspaceManager::instance()->empty());
 }
 
 void PeViewer::updateCurrentWorkspace(Workspace* workspace) {

@@ -5,6 +5,7 @@
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+    Q_INIT_RESOURCE(SARibbonResource);
     QCoreApplication::setOrganizationName(QStringLiteral("PeViewer"));
     QCoreApplication::setApplicationName(QStringLiteral("PeViewer"));
     LanguageManager languageManager;
