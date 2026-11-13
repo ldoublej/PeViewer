@@ -8,7 +8,7 @@
 #include "parse_error.h"
 #include "sections.h"
 
-class PeDataSource;
+class PeDataSource; 
 
 // Owns parsed results and borrows the data source for each parse() call.
 class PeFile {

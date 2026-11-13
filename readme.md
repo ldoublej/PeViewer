@@ -1,5 +1,15 @@
 # PeViewer
 
+构建需要 CMake 3.19+。SARibbon v2.9.6 和 QWindowKit 从源码编译为静态库，
+启用 `SARIBBON_USE_FRAMELESS_LIB`，关闭第三方库的测试与示例。
+首次克隆后先初始化递归子模块（包括 QWindowKit 的依赖）：
+
+```powershell
+git submodule update --init --recursive
+```
+
+Qt 安装需要包含 Widgets、Svg、LinguistTools，以及 QWindowKit 使用的 Qt 私有头文件。
+
 仅支持小端平台，整数和 UTF-16 代码单元直接按本机布局读取。
 
 界面支持简体中文和英文。在“语言 / Language”菜单中切换后立即生效，

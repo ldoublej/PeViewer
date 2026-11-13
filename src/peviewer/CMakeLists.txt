@@ -64,6 +64,7 @@ target_link_libraries(${PROJECT_NAME}
         workspace
         datasource
         dependencies
+        SARibbonBar::SARibbonBar
     PUBLIC
         Qt::Core
         Qt::Gui
