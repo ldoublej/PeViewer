@@ -2,6 +2,26 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN" sourcelanguage="en">
 <context>
+    <name>DependencyTreeEditorView</name>
+    <message>
+        <location filename="../editors/dependency_tree_editor_view.cpp" line="+29"/>
+        <source>Dependency</source>
+        <translation>依赖</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <location line="+10"/>
+        <source>View</source>
+        <translation>视图</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <location line="+5"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+</context>
+<context>
     <name>DependencyTreeModel</name>
     <message>
         <location filename="../components/dependency_tree_model.cpp" line="+270"/>
@@ -72,7 +92,7 @@
 <context>
     <name>PeViewer</name>
     <message>
-        <location filename="../pe_viewer.cpp" line="+75"/>
+        <location filename="../pe_viewer.cpp" line="+82"/>
         <location line="+130"/>
         <source>Home</source>
         <translation>主页</translation>
@@ -92,12 +112,12 @@
         <translation>语言</translation>
     </message>
     <message>
-        <location line="+47"/>
+        <location line="+49"/>
         <source>Ready</source>
         <translation>就绪</translation>
     </message>
     <message>
-        <location line="-109"/>
+        <location line="-111"/>
         <source>Open PE File</source>
         <translation>打开 PE 文件</translation>
     </message>
@@ -120,12 +140,12 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+30"/>
+        <location line="+33"/>
         <source>Search documents...</source>
         <translation>搜索文档...</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+13"/>
         <source>Loaded %1: %2 modules</source>
         <translation>已加载 %1：%2 个模块</translation>
     </message>
@@ -134,11 +154,22 @@
     <name>PeViewerClass</name>
     <message>
         <location filename="../pe_viewer.ui" line="+14"/>
+        <location line="+64"/>
         <source>PeViewer</source>
         <translation>PeViewer</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+10"/>
+        <source>Open a PE file to start</source>
+        <translation>打开 PE 文件以开始</translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Open File...</source>
+        <translation>打开文件...</translation>
+    </message>
+    <message>
+        <location line="+57"/>
         <source>Open</source>
         <translation>打开</translation>
     </message>

@@ -9,6 +9,14 @@ set(PROJECT_SOURCES
     pe_viewer.cpp
     language_manager.h
     language_manager.cpp
+    editor_host.h
+    editor_host.cpp
+    editor_registration.h
+    editor_registration.cpp
+    editors/pe_editor.h
+    editors/pe_editor.cpp
+    editors/dependency_tree_editor_view.h
+    editors/dependency_tree_editor_view.cpp
     components/dependency_tree_widget.h
     components/dependency_tree_widget.cpp
     components/dependency_tree_view.h

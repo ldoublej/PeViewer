@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "document.h"
+#include "editor.h"
 
 namespace {
 QString canonicalPath(const QString& path) {
@@ -30,6 +31,14 @@ DocumentManager* DocumentManager::instance() {
 DocumentManager::DocumentManager() = default;
 DocumentManager::~DocumentManager() = default;
 
+void DocumentManager::setEditorFactory(EditorFactory factory) {
+    m_editorFactory = std::move(factory);
+}
+
+Editor* DocumentManager::currentEditor() const {
+    return m_current ? m_current->editor() : nullptr;
+}
+
 Document* DocumentManager::open(const QString& path, OpenMode mode) {
     if (Document* document = find(path)) {
         if (mode == OpenMode::OpenAndActivate) {
@@ -39,7 +48,8 @@ Document* DocumentManager::open(const QString& path, OpenMode mode) {
     }
 
     // Build first so a failure leaves the list and current document intact.
-    auto document = std::make_unique<Document>(path);
+    auto document = std::make_unique<Document>(path, FileLocatorOptions::systemDefaults(),
+                                               m_editorFactory);
     Document* opened = document.get();
     m_documents.push_back(std::move(document));
     emit documentOpened(opened);
@@ -73,10 +83,17 @@ bool DocumentManager::activate(Document* document) {
 }
 
 bool DocumentManager::close(Document* document) {
+    if (!document) {
+        return false;
+    }
     const auto found = std::find_if(
         m_documents.begin(), m_documents.end(),
         [document](const std::unique_ptr<Document>& entry) { return entry.get() == document; });
     if (found == m_documents.end()) {
+        return false;
+    }
+    // Only ask after the pointer is known to be alive: callers may pass a stale pointer.
+    if (Editor* editor = (*found)->editor(); editor && !editor->canClose()) {
         return false;
     }
 

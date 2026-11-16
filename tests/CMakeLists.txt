@@ -13,6 +13,10 @@ foreach(test IN ITEMS api_set module_locator dependency_graph pe_file_store)
     add_test(NAME ${test}_tests COMMAND ${test}_tests)
 endforeach()
 
+add_executable(EditorTests editor_tests.cpp)
+target_link_libraries(EditorTests PRIVATE editor)
+add_test(NAME EditorTests COMMAND EditorTests)
+
 add_executable(DocumentTests document_tests.cpp)
 target_link_libraries(DocumentTests PRIVATE document)
 add_test(NAME DocumentTests COMMAND DocumentTests)
@@ -43,6 +47,14 @@ add_executable(PeViewerUiTests
     ../src/peviewer/pe_viewer.ui
     ../src/peviewer/language_manager.cpp
     ../src/peviewer/language_manager.h
+    ../src/peviewer/editor_host.cpp
+    ../src/peviewer/editor_host.h
+    ../src/peviewer/editor_registration.cpp
+    ../src/peviewer/editor_registration.h
+    ../src/peviewer/editors/pe_editor.cpp
+    ../src/peviewer/editors/pe_editor.h
+    ../src/peviewer/editors/dependency_tree_editor_view.cpp
+    ../src/peviewer/editors/dependency_tree_editor_view.h
     ../src/peviewer/components/dependency_tree_widget.cpp
     ../src/peviewer/components/dependency_tree_widget.h
     ../src/peviewer/components/dependency_tree_view.cpp

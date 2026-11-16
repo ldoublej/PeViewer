@@ -1,15 +1,23 @@
 # document
 
 `Document` 表示一次打开的会话：持有 `PeFileDataSource`、根 `PeFile`、
-`PeFileStore` 以及由它们构建的 `DependencyGraph`。构造时完成打开、解析和依赖构建，
-失败通过异常报告，不会留下半成品。
+`PeFileStore`、由它们构建的 `DependencyGraph`，以及该文档的 `Editor`。
+构造时完成打开、解析、依赖构建和编辑器创建，失败通过异常报告，不会留下半成品。
 
 ```cpp
 #include <document.h>
 
-Document document(path);  // 打开并构建依赖图
-const DependencyGraph& graph = document.graph();
+// 只建数据（测试 / 非 UI 用法），editor() 为 nullptr
+Document document(path);
+
+// 由 DocumentManager 打开时注入工厂，editor() 一定非空
+Document* opened = DocumentManager::instance()->open(path);
+Editor* editor = opened->editor();
 ```
+
+`Editor` 的创建由外部注入的 `Document::EditorFactory` 完成，视图则由
+`Editor::attachRegisteredViews()` 从 `EditorViewRegistry` 实例化；
+`Editor` 只持有视图，不持有 Ribbon 控件。
 
 `DocumentManager` 是单例，通过 `DocumentManager::instance()` 获取唯一实例，
 持有所有已打开的 `Document`，并记录当前激活的会话。实例首次访问时创建，程序退出时销毁，
@@ -18,6 +26,7 @@ const DependencyGraph& graph = document.graph();
 `OpenMode::OpenOnly` 仅打开，保持当前会话不变（即使原本没有当前会话）；
 默认的 `OpenMode::OpenAndActivate` 打开并激活。重复打开同一路径会复用已有会话，
 按指定模式决定是否激活，不会重复构建。
+`close()` 会先询问 `Editor::canClose()`，返回 false 时取消关闭。
 
 ```cpp
 auto* manager = DocumentManager::instance();

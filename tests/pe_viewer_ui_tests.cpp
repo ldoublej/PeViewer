@@ -11,10 +11,13 @@
 #include <QLineEdit>
 #include <QMenuBar>
 #include <QSettings>
+#include <QStackedWidget>
 #include <QStatusBar>
 #include <QTemporaryDir>
 #include <QTreeView>
 #include <QToolButton>
+#include <QWidget>
+#include <editor.h>
 #include <SARibbonApplicationButton.h>
 #include <SARibbonBar.h>
 #include <SARibbonCategory.h>
@@ -27,6 +30,7 @@
 #include "dependencies_test_support.h"
 #include "document.h"
 #include "document_manager.h"
+#include "editor_registration.h"
 #include "language_manager.h"
 #include "pe_viewer.h"
 
@@ -160,6 +164,12 @@ void searchDocuments(QComboBox* combo, const QString& query) {
     pressKey(combo->lineEdit(), 0, query);
 }
 
+bool displayShowsIdentity(QStackedWidget* stack, const QString& identity) {
+    QWidget* page = stack ? stack->currentWidget() : nullptr;
+    auto* tree = page ? page->findChild<QTreeView*>(QStringLiteral("dependencyTreeView")) : nullptr;
+    return tree && tree->model() && tree->model()->index(0, 2).data().toString() == identity;
+}
+
 void testDocumentSelector() {
     QTemporaryDir temporary;
     require(temporary.isValid(), "Temporary directory failed");
@@ -179,13 +189,14 @@ void testDocumentSelector() {
     QApplication::processEvents();
     auto* manager = DocumentManager::instance();
     auto* combo = window.findChild<QComboBox*>(QStringLiteral("documentCombo"));
-    auto* tree = window.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+    auto* homePage = window.findChild<QWidget*>(QStringLiteral("homePage"));
     auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
     auto* fileMenu = window.findChild<SARibbonMenu*>(QStringLiteral("ribbonFileMenu"));
     auto* fileButton = window.findChild<SARibbonApplicationButton*>(QStringLiteral("ribbonApplicationButton"));
-    require(combo && tree && closeAction && fileMenu && fileButton &&
+    require(combo && stack && homePage && closeAction && fileMenu && fileButton &&
                 fileMenu->actions().contains(closeAction),
-            "Document selector, dependency tree or file menu is missing");
+            "Document selector, view stack or file menu is missing");
     require(fileButton->width() - fileButton->fontMetrics().horizontalAdvance(fileButton->text()) <= 40,
             "File button is much wider than its text");
     require(combo->parentWidget() == window.ribbonBar()->quickAccessBar(),
@@ -195,17 +206,19 @@ void testDocumentSelector() {
             "Document selector extends outside the title bar");
     require(combo->count() == 0 && combo->currentIndex() == -1 && !combo->isEnabled() &&
                 !closeAction->isEnabled(), "Empty document controls are enabled or selected");
+    require(stack->currentWidget() == homePage, "Empty window does not show the home page");
 
     Document* first = manager->open(firstPath, DocumentManager::OpenMode::OpenOnly);
     require(combo->isEnabled() && combo->count() == 1 && combo->currentIndex() == -1 &&
-                combo->currentText().isEmpty() && !closeAction->isEnabled() && tree->model()->rowCount() == 0,
+                combo->currentText().isEmpty() && !closeAction->isEnabled() &&
+                stack->currentWidget() == homePage,
             "OpenOnly selected or displayed a document");
     require(combo->itemData(0).toString() == firstPath &&
                 combo->itemText(0) == QDir::toNativeSeparators(firstPath),
             "Document path is missing or its ampersand was changed");
     selectDocument(combo, 0);
     require(manager->current() == first && combo->currentData().toString() == firstPath &&
-                closeAction->isEnabled() && tree->model()->index(0, 2).data().toString() == firstIdentity,
+                closeAction->isEnabled() && displayShowsIdentity(stack, firstIdentity),
             "Selecting a document did not activate and display it");
     require(window.statusBar()->currentMessage() == QStringLiteral("Loaded app.exe: 1 modules"),
             "Document activation did not update the status");
@@ -213,7 +226,7 @@ void testDocumentSelector() {
     Document* second = manager->open(secondPath);
     require(combo->count() == 2 && combo->currentData().toString() == secondPath &&
                 combo->itemText(0) != combo->itemText(1) &&
-                tree->model()->index(0, 2).data().toString() == secondIdentity,
+                displayShowsIdentity(stack, secondIdentity),
             "Documents with the same filename cannot be distinguished");
     searchDocuments(combo, QStringLiteral("LEFT&PART"));
     auto* completer = combo->completer();
@@ -223,7 +236,7 @@ void testDocumentSelector() {
     pressKey(completer->popup(), Qt::Key_Return);
     require(manager->current() == first && combo->currentData().toString() == firstPath &&
                 combo->currentText() == QDir::toNativeSeparators(firstPath) &&
-                tree->model()->index(0, 2).data().toString() == firstIdentity,
+                displayShowsIdentity(stack, firstIdentity),
             "Selecting a filtered result did not activate the correct document");
     searchDocuments(combo, QStringLiteral("RIGHT"));
     require(completer->completionCount() == 1, "Second document did not match the query");
@@ -246,9 +259,11 @@ void testDocumentSelector() {
     require(combo->count() == 2 && combo->currentText() == QDir::toNativeSeparators(firstPath),
             "Invalid input inserted a document or left stale text");
     searchDocuments(combo, QStringLiteral("left"));
-    // An outside click dismisses the native popup before focus moves to the tree.
+    // An outside click dismisses the native popup before focus moves to the page.
     completer->popup()->hide();
-    tree->setFocus();
+    QWidget* activePage = stack->currentWidget();
+    require(activePage != nullptr, "Active document page is missing");
+    activePage->setFocus();
     QApplication::processEvents();
     require(manager->current() == first && combo->currentText() == QDir::toNativeSeparators(firstPath),
             "Leaving the search field did not restore the current document");
@@ -258,16 +273,14 @@ void testDocumentSelector() {
     {
         PeViewer otherWindow(languages);
         auto* otherCombo = otherWindow.findChild<QComboBox*>(QStringLiteral("documentCombo"));
-        auto* otherTree = otherWindow.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
-        require(otherCombo && otherTree && otherCombo->count() == 2 &&
-                    otherCombo->currentData().toString() == firstPath &&
-                    otherTree->model()->index(0, 2).data().toString() == firstIdentity,
+        auto* otherStack = otherWindow.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+        require(otherCombo && otherStack && otherCombo->count() == 2 &&
+                    otherCombo->currentData().toString() == firstPath,
                 "New window did not load existing documents");
         otherWindow.show();
         QApplication::processEvents();
         selectDocument(otherCombo, otherCombo->findData(secondPath));
-        require(manager->current() == second && combo->currentData().toString() == secondPath &&
-                    tree->model()->index(0, 2).data().toString() == secondIdentity,
+        require(manager->current() == second && combo->currentData().toString() == secondPath,
                 "Document activation was not synchronized between windows");
     }
 
@@ -280,7 +293,7 @@ void testDocumentSelector() {
     closeAction->trigger();
     require(manager->current() == first && combo->count() == 1 &&
                 combo->currentData().toString() == firstPath && closeAction->isEnabled() &&
-                tree->model()->index(0, 2).data().toString() == firstIdentity,
+                displayShowsIdentity(stack, firstIdentity),
             "Closing the current document did not select and display the fallback");
     second = manager->open(secondPath, DocumentManager::OpenMode::OpenOnly);
     require(combo->count() == 2 && combo->currentData().toString() == firstPath,
@@ -293,14 +306,74 @@ void testDocumentSelector() {
     manager->open(secondPath, DocumentManager::OpenMode::OpenOnly);
     manager->closeAll();
     require(combo->count() == 0 && combo->currentIndex() == -1 && combo->currentText().isEmpty() &&
-                !combo->isEnabled() && !closeAction->isEnabled() && tree->model()->rowCount() == 0 &&
+                !combo->isEnabled() && !closeAction->isEnabled() && stack->currentWidget() == homePage &&
                 window.statusBar()->currentMessage() == QStringLiteral("就绪"),
-            "Closing all documents did not clear the selector and dependency tree");
+            "Closing all documents did not clear the selector and view pages");
     manager->open(firstPath);
     closeAction->trigger();
     require(manager->empty() && combo->count() == 0 && !combo->isEnabled() &&
-                !closeAction->isEnabled() && tree->model()->rowCount() == 0,
+                !closeAction->isEnabled() && stack->currentWidget() == homePage,
             "Closing the final document did not disable document controls");
+    QSettings().remove(QStringLiteral("ui/language"));
+}
+
+void testEditorViews() {
+    QTemporaryDir temporary;
+    require(temporary.isValid(), "Temporary directory failed");
+    const QDir dir(temporary.path());
+    DependencyTests::writePe(dir, QStringLiteral("editor.exe"));
+    const QString path = dir.filePath(QStringLiteral("editor.exe"));
+
+    QSettings().setValue(QStringLiteral("ui/language"), QStringLiteral("en"));
+    LanguageManager languages;
+    PeViewer window(languages);
+    window.show();
+    QApplication::processEvents();
+
+    auto* ribbon = window.ribbonBar();
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+    auto* homePage = window.findChild<QWidget*>(QStringLiteral("homePage"));
+    auto* home = window.findChild<SARibbonCategory*>(QStringLiteral("ribbonHome"));
+    auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
+    require(ribbon && stack && homePage && home && closeAction, "Editor host widgets are missing");
+    require(stack->currentWidget() == homePage, "Home page is not shown without documents");
+    require(ribbon->categoryPages().size() == 1, "Unexpected Ribbon tabs without documents");
+
+    auto* manager = DocumentManager::instance();
+    Document* document = manager->open(path);
+    QApplication::processEvents();
+    auto* viewPage = window.findChild<SARibbonCategory*>(QStringLiteral("editorView/dependency-tree"));
+    require(document && document->editor() && viewPage && document->editor()->views().size() == 1,
+            "Opening a document did not create its editor view");
+    require(ribbon->categoryPages().size() == 2, "View tab was not added next to Home");
+    require(ribbon->categoryByIndex(ribbon->currentIndex()) == viewPage, "View tab is not selected");
+    require(viewPage->categoryName() == QStringLiteral("Dependency"),
+            "View tab title is not translated");
+    require(stack->currentWidget() != homePage, "View page is not displayed");
+    require(stack->count() == 2, "View page was not added to the stack");
+    require(closeAction->isEnabled(), "Close action is disabled with an open document");
+
+    // Home switches the central page; the view tab restores it.
+    ribbon->setCurrentIndex(ribbon->categoryIndex(home));
+    QApplication::processEvents();
+    require(stack->currentWidget() == homePage, "Home tab did not show the home page");
+    ribbon->setCurrentIndex(ribbon->categoryIndex(viewPage));
+    QApplication::processEvents();
+    require(stack->currentWidget() != homePage, "View tab did not restore the view page");
+
+    require(languages.setLanguage(QStringLiteral("zh_CN")), "Could not switch to Chinese");
+    QApplication::processEvents();
+    require(viewPage->categoryName() == QStringLiteral("依赖"), "View tab was not retranslated");
+    require(languages.setLanguage(QStringLiteral("en")), "Could not switch to English");
+    QApplication::processEvents();
+    require(viewPage->categoryName() == QStringLiteral("Dependency"), "View tab title was not restored");
+
+    closeAction->trigger();
+    QApplication::processEvents();
+    require(manager->empty() && !closeAction->isEnabled() && stack->currentWidget() == homePage,
+            "Closing the document did not return to the home page");
+    require(window.ribbonBar()->categoryPages().size() == 1, "View tab was not removed");
+    require(stack->count() == 1, "View page was not released with its document");
     QSettings().remove(QStringLiteral("ui/language"));
 }
 }  // namespace
@@ -316,10 +389,12 @@ int main(int argc, char* argv[]) {
     }
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory.path());
+    registerPeEditorViews();
 
     try {
         testLanguageSwitching();
         testDocumentSelector();
+        testEditorViews();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

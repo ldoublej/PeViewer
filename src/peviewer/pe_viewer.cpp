@@ -12,6 +12,7 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSignalBlocker>
 #include <QStyle>
 #include <QTimer>
@@ -25,14 +26,18 @@
 #include <SARibbonQuickAccessBar.h>
 
 #include "dependency_graph.h"
-#include "language_manager.h"
 #include "document.h"
 #include "document_manager.h"
+#include "editor_host.h"
+#include "language_manager.h"
 
 PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     : SARibbonMainWindow(parent), m_languageManager(languageManager) {
     ui.setupUi(this);
     setupRibbon();
+    m_editorHost = new EditorHost(ribbonBar(), ui.viewStack, ui.homePage, this);
+    connect(ui.homeOpenButton, &QPushButton::clicked, ui.actionOpen, &QAction::trigger);
+
     auto* languageActions = new QActionGroup(this);
     languageActions->setExclusive(true);
     languageActions->addAction(ui.actionEnglish);
@@ -62,8 +67,10 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
 }
 
 PeViewer::~PeViewer() {
-    // Detach the model from the graph owned by the singleton manager.
-    ui.dependencyTree->clear();
+    // Keep the view pages alive: documents outlive the window and rebuild them later.
+    if (m_editorHost) {
+        m_editorHost->detachViews();
+    }
 }
 
 void PeViewer::setupRibbon() {
@@ -209,6 +216,9 @@ void PeViewer::retranslateUi() {
     m_documentCombo->setAccessibleName(tr("Document"));
     m_documentCombo->lineEdit()->setPlaceholderText(tr("Search documents..."));
     m_languagePanel->setPanelName(tr("Language"));
+    if (m_editorHost) {
+        m_editorHost->retranslateUi();
+    }
     updateDocumentStatus();
     updateDocumentSelection();
 }
@@ -244,7 +254,6 @@ void PeViewer::updateDocumentSelection() {
 void PeViewer::updateCurrentDocument(Document* document) {
     ui.actionClose->setEnabled(document != nullptr);
     updateDocumentSelection();
-    ui.dependencyTree->setGraph(document ? &document->graph() : nullptr);
     updateDocumentStatus();
 }
 

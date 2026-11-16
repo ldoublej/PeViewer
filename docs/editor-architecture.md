@@ -1,6 +1,6 @@
 # 编辑器架构设计：Document / Editor / EditorView
 
-> 状态：设计定稿，待实施
+> 状态：已实现（P1–P4），实现细节以代码为准
 > 基线：`dev` @ `c95a55a`（SARibbon v2.9.6，Qt 5.15.2）
 > 适用：PeViewer 主窗口的 Ribbon 页签组织与文档打开/关闭
 
@@ -525,7 +525,7 @@ private:
 | `Document` | `DocumentManager::open` | `DocumentManager`（`vector<unique_ptr>`） | `close` / `closeAll` / 退出 |
 | `Editor` | 注册的 `EditorFactory` | `Document`（`unique_ptr` 成员） | 随文档销毁 |
 | `EditorView` | `Editor::attachRegisteredViews` | `Editor`（`vector<unique_ptr>`） | 随 Editor 销毁 |
-| 视图中央控件 | 视图自己 | 视图持有并负责 delete；`QObject` 父对象是 `viewStack`（加入时 reparent） | 随视图销毁 |
+| 视图中央控件 | 视图自己 | 视图持有 `QPointer`，加入 `viewStack` 后 `QObject` 父对象是 `viewStack`；窗口销毁时 `EditorHost::detachViews()` 先摘出，视图之后按需重建 | 随窗口或视图销毁；视图在下次 `contentWidget()` 时重建并重新同步数据 |
 | Ribbon 页签 `SARibbonCategory` | `EditorHost` | `EditorHost` | 切文档/关文档/退出前 `removeCategory` 后删除 |
 | 视图的 `QAction` | 视图自己 | 视图 | 随视图销毁，页签重建不影响 |
 
@@ -614,7 +614,8 @@ int main(int argc, char* argv[]) {
 
 - 每次文档激活**重建**页签，视图对象与中央控件**常驻**（状态不丢）。理由：多文档时若页签常驻，需要 `hideCategory` + `moveCategory` 维护顺序，SARibbon 在隐藏页签组合上有历史缺陷（2.9.6 才修 #160）；而页签本身只是 action 的壳，重建成本可忽略。
 - 建页顺序 = 注册表顺序 = 页签顺序 = 视图下标顺序。
-- 拆页顺序：`removeCategory(page)` → `page->deleteLater()`。
+- 拆页顺序：`removeCategory(page)` → `delete page`（`removeCategory` 只摘除、不删除）。
+- 例外：窗口销毁时中央控件随 `viewStack` 一起销毁，视图用 `QPointer` 感知并在下次 `contentWidget()` 时重建；`PeViewer` 析构会先调用 `EditorHost::detachViews()`，避免窗口带走在其它窗口/文档仍在使用的页面。
 
 ### 9.5 代码要点
 
@@ -704,7 +705,7 @@ void EditorHost::showView(EditorView* view) {
 
 ## 12. 迁移步骤
 
-### P1 纯重命名（行为零变化，单独提交）
+### P1 纯重命名（行为零变化，单独提交）— 已完成
 
 1. `git mv src/workspace src/document`；`workspace.h/.cpp` → `document.h/.cpp`；`workspace_manager.*` → `document_manager.*`；
 2. 类名 `Workspace` → `Document`、`WorkspaceManager` → `DocumentManager`；信号 `workspaceOpened` → `documentOpened` 等；`workspaces()` → `documents()`；
@@ -716,7 +717,7 @@ void EditorHost::showView(EditorView* view) {
 
 提交信息：`refactor: 重命名 Workspace 为 Document`。
 
-### P2 框架层
+### P2 框架层 — 已完成
 
 1. 新增 `src/editor`（`Editor`、`EditorView`、`EditorViewRegistry`）；
 2. `Document` 增加 `m_editor` 与 `EditorFactory` 参数，末尾创建 Editor 并 `attachRegisteredViews()`；
@@ -726,7 +727,7 @@ void EditorHost::showView(EditorView* view) {
 
 提交信息：`feat: 引入 Editor/EditorView 框架`。
 
-### P3 主窗口接入
+### P3 主窗口接入 — 已完成
 
 1. `PeEditor`、`DependencyTreeEditorView`、`registerPeEditorViews()`；`main()` 里先注册再建窗口；
 2. `.ui` 中央区换成 `QStackedWidget`（`viewStack`），第 0 页 `homePage`；
@@ -738,7 +739,7 @@ void EditorHost::showView(EditorView* view) {
 
 提交信息：`feat: 文档视图以 Ribbon 页签呈现`。
 
-### P4 收尾
+### P4 收尾 — 已完成
 
 1. 清理 `readme.md`、`src/document/readme.md`、`src/peviewer/` 的说明；
 2. 全量构建（`out/build/debug`、`out/build/uitest`）+ `ctest`；
@@ -809,6 +810,7 @@ void EditorHost::showView(EditorView* view) {
 ## 16. 风险与注意事项
 
 1. **`src/document` 变成 UI 依赖**：它现在链接 `editor`（进而 `Qt::Widgets`、SARibbon）。纯数据测试不要传 `EditorFactory`，就不会实例化任何 widget；`DocumentTests` 因此不需要 `QApplication`。
+2. **多窗口不是目标**：一个文档只有一个视图控件，第二个窗口激活文档时会把页面从第一个窗口“搬走”；`detachViews()` 保证窗口销毁时不连带删除，但两个窗口同时显示同一文档不支持。
 2. **页签重建的中间态**：任何批量增删页签的路径都必须走 `m_rebuilding`，否则会出现内容闪跳。
 3. **`m_currentView == nullptr` 合法**：正停在主页时为空，所有使用者都要判空（状态栏、菜单 enable、`retranslateUi`）。
 4. **视图契约**：`contentWidget()` 幂等；`populateRibbon()` 可重复调用且只挂自身 action；`title()` 每次取 `tr()`。

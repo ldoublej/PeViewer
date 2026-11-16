@@ -5,6 +5,7 @@
 #include "ui_pe_viewer.h"
 
 class Document;
+class EditorHost;
 class LanguageManager;
 class QComboBox;
 class SARibbonApplicationButton;
@@ -41,6 +42,7 @@ private:
 
     LanguageManager& m_languageManager;
     QComboBox* m_documentCombo = nullptr;
+    EditorHost* m_editorHost = nullptr;
     SARibbonApplicationButton* m_applicationButton = nullptr;
     SARibbonMenu* m_fileMenu = nullptr;
     SARibbonCategory* m_homeCategory = nullptr;

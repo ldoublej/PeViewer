@@ -12,12 +12,18 @@ Qt 安装需要包含 Widgets、Svg、LinguistTools，以及 QWindowKit 使用�
 
 仅支持小端平台，整数和 UTF-16 代码单元直接按本机布局读取。
 
-主窗口使用 SARibbon，左上角的“文件 / File”菜单包含打开和关闭文档（Ctrl+O / Ctrl+W），
-主页中包含语言分组。
+主窗口使用 SARibbon，左上角的“文件 / File”菜单包含打开和关闭文档（Ctrl+O / Ctrl+W）。
+「主页」是起始页：没有文档时显示欢迎页与“打开文件…”按钮，有文档时点主页也会回到该页。
 标题栏的下拉框列出所有已打开的文档，输入文件名或路径可检索（忽略大小写），
 选中结果后切换文档。按 Esc 或离开输入框可取消检索，恢复显示当前文档。
 在语言分组中切换简体中文和英文后立即生效，
 并自动保存选择；首次启动时，中文系统使用简体中文，其他系统使用英文。
+
+打开文档后，会出现该文档 Editor 的 Ribbon 页签，**一个页签对应一个 `EditorView`**，
+每个视图同时提供自己的页签面板和中央页面（当前实现为依赖树）。页签由 `src/editor`
+框架按 `EditorViewRegistry` 创建，视图实现位于 `src/peviewer/editors/`；
+程序在 `main()` 中通过 `registerPeEditorViews()` 完成注册。完整设计见
+[docs/editor-architecture.md](docs/editor-architecture.md)。
 
 翻译文件位于 `src/peviewer/translations/`。构建时，Qt Linguist 的 `lrelease`
 会将 `.ts` 编译为 `.qm` 并嵌入程序，开发运行和安装后均无需额外复制应用翻译文件。

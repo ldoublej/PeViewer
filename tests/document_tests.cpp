@@ -1,11 +1,13 @@
 #include <document.h>
 #include <document_manager.h>
+#include <editor.h>
 #include <pe_data_source.h>
 #include <pe_file.h>
 
 #include <QDir>
 #include <QFileInfo>
 #include <QTemporaryDir>
+#include <memory>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
@@ -19,6 +21,23 @@ namespace {
 static_assert(!std::is_default_constructible_v<DocumentManager>);
 static_assert(!std::is_copy_constructible_v<DocumentManager>);
 static_assert(!std::is_move_constructible_v<DocumentManager>);
+
+// Minimal editor used to observe creation, close veto and destruction order.
+class TrackingEditor : public Editor {
+public:
+    TrackingEditor(Document& document, bool& allowClose, bool& destroyed)
+        : Editor(document.path()), m_document(document), m_allowClose(allowClose), m_destroyed(destroyed) {}
+
+    ~TrackingEditor() override { m_destroyed = true; }
+
+    bool canClose() const override { return m_allowClose; }
+    const Document& document() const { return m_document; }
+
+private:
+    Document& m_document;
+    bool& m_allowClose;
+    bool& m_destroyed;
+};
 
 QString writeFixture(const QDir& dir, const QString& name,
                      const QStringList& imports = QStringList{}) {
@@ -43,6 +62,8 @@ void opensSession() {
     require(document.graph().moduleCount() == 2, "Dependency graph was not built");
     require(document.files().size() == 1 && document.graph().files().size() == 1,
             "Document does not expose its dependency store");
+    require(document.editor() == nullptr,
+            "Document without an editor factory created an editor");
 }
 
 void managerTracksList() {
@@ -219,10 +240,42 @@ void managerSignalsAndOpenModes() {
                   QStringLiteral("closed:first.exe"), QStringLiteral("closed:second.exe")});
 }
 
+void editorLifecycle() {
+    QTemporaryDir temporary;
+    require(temporary.isValid(), "Temporary directory failed");
+    const QDir dir(temporary.path());
+    const QString path = writeFixture(dir, QStringLiteral("editor.exe"));
+
+    bool allowClose = true;
+    bool destroyed = false;
+    auto* manager = DocumentManager::instance();
+    manager->setEditorFactory([&](Document& document) {
+        return std::make_unique<TrackingEditor>(document, allowClose, destroyed);
+    });
+
+    Document* document = manager->open(path);
+    require(document->editor() != nullptr, "Editor factory was not used");
+    require(manager->currentEditor() == document->editor(),
+            "currentEditor() did not return the active document's editor");
+
+    allowClose = false;
+    require(!manager->close(document), "canClose() == false did not cancel the close");
+    require(manager->size() == 1 && !destroyed, "Vetoed close removed the document");
+
+    allowClose = true;
+    require(manager->close(document), "Closing the document failed");
+    require(destroyed, "Editor was not destroyed together with its document");
+    require(manager->empty() && manager->currentEditor() == nullptr,
+            "Manager kept state after the document was closed");
+
+    manager->setEditorFactory({});
+}
+
 void tests() {
     opensSession();
     managerTracksList();
     managerSignalsAndOpenModes();
+    editorLifecycle();
 }
 }  // namespace
 
