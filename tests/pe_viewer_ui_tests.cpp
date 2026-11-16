@@ -8,6 +8,7 @@
 #include <QFontMetrics>
 #include <QLocale>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMenuBar>
 #include <QSettings>
@@ -340,6 +341,12 @@ void testEditorViews() {
             "Window default margins leave a border around the Ribbon");
     require(ribbon->x() == 0 && ribbon->width() == window.width(),
             "Ribbon does not span the full window width");
+    auto* ribbonBorder = window.findChild<QLabel*>(QStringLiteral("ribbonBorder"));
+    require(ribbonBorder && ribbonBorder->height() == 1 &&
+                ribbonBorder->width() == window.centralWidget()->width(),
+            "Ribbon separator line is missing or does not span the window");
+    require(ribbonBorder->y() + ribbonBorder->height() == stack->y(),
+            "Ribbon separator is not directly above the central pages");
     require(stack->currentWidget() == homePage, "Home page is not shown without documents");
     require(ribbon->categoryPages().size() == 1, "Unexpected Ribbon tabs without documents");
 

@@ -31,6 +31,28 @@
      <number>0</number>
     </property>
     <item>
+     <widget class="QLabel" name="ribbonBorder">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>1</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>1</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: #bec0c2;</string>
+      </property>
+      <property name="text">
+       <string notr="true"/>
+      </property>
+     </widget>
+    </item>
+    <item>
      <widget class="QStackedWidget" name="viewStack">
       <property name="currentIndex">
        <number>0</number>
