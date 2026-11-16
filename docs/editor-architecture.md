@@ -50,7 +50,7 @@ Ribbon 只有「主页」一个页签（里面只有语言面板），「文件�
 |---|---|---|
 | `Document` | 一次打开的会话：数据源、根 `PeFile`、`PeFileStore`、依赖图，以及它的 `Editor` | 1 文件 : 1 文档 |
 | `DocumentManager` | 单例。`open/find/activate/close/closeAll`，维护文档列表与当前文档 | 1 |
-| `Editor` | 文档的呈现容器：显示名、状态栏摘要、能否关闭、视图集合 | 1 文档 : 1 Editor |
+| `Editor` | 文档的呈现容器：显示名、能否关闭、视图集合 | 1 文档 : 1 Editor |
 | `EditorView` | 一个 Ribbon 页签 + 一个中央页面；负责面板/动作与页面 UI | 1 Editor : N 视图 |
 | `EditorViewRegistry` | 视图类型注册表：id、顺序、适用性、工厂 | 1 |
 | `EditorHost`（主窗口侧） | 页签 ↔ `QStackedWidget` 的联动，页签重建、语言转发、当前视图跟踪 | 1 |
@@ -186,8 +186,6 @@ public:
     const QString& path() const { return m_path; }
     // Display name in the document selector, defaults to the file name.
     virtual QString displayName() const;
-    // Status bar summary for the active editor, empty means "nothing to say".
-    virtual QString statusText() const { return {}; }
     // Asked before closing; false cancels the close (unsaved changes).
     virtual bool canClose() const { return true; }
     virtual void retranslateUi() {}
@@ -413,13 +411,12 @@ Document* DocumentManager::open(const QString& path, OpenMode mode) {
 #include <document.h>
 #include <editor.h>
 
-// PE 文档的编辑器：只提供 PE 相关的显示信息，数据仍在 Document 里。
+// PE 文档的编辑器：为视图提供类型化的数据入口，显示细节归主窗口。
 class PeEditor : public Editor {
 public:
     explicit PeEditor(Document& document);
 
     QString displayName() const override;   // 文件名
-    QString statusText() const override;    // "已加载 app.exe：3 个模块"
     const Document& document() const { return m_document; }
 
 private:
@@ -427,18 +424,11 @@ private:
 };
 ```
 
-> 说明：`Editor::path()` 已经由构造传入，`PeEditor` 只需要数据引用和 PE 文案。
-> `Editor` 不是 `QObject`，需要翻译的文案用 `QCoreApplication::translate("PeEditor", ...)`，
-> 让 lupdate 归到 `PeEditor` 上下文（P3 会新增该条译文的 `zh_CN` 翻译）。
+> 说明：`Editor::path()` 已经由构造传入，`PeEditor` 只需要数据引用。
+> 状态栏文案、窗口标题等由 `PeViewer` 生成（见 D10），`Editor` 不暴露显示文案接口。
 
 ```cpp
 PeEditor::PeEditor(Document& document) : Editor(document.path()), m_document(document) {
-}
-
-QString PeEditor::statusText() const {
-    return QCoreApplication::translate("PeEditor", "Loaded %1: %2 modules")
-        .arg(QFileInfo(m_document.path()).fileName())
-        .arg(static_cast<qulonglong>(m_document.graph().moduleCount()));
 }
 ```
 
@@ -564,7 +554,7 @@ PeViewer::on_actionOpen_triggered
                  ├─ 为每个视图建 SARibbonCategory + populateRibbon + addCategoryPage
                  ├─ 视图 contentWidget 加入 viewStack（已在则复用）
                  ├─ 选中该文档上次的视图（首次为首个）
-                 └─ 状态栏 ← editor->statusText()
+                 └─ 状态栏 ← 当前文档的路径与模块数（PeViewer 拼装）
 ```
 
 `Document` 构造失败时不会进入列表，因此不存在"半个文档"。这与现有 `Workspace` 的原子性一致。
@@ -680,7 +670,7 @@ void EditorHost::showView(EditorView* view) {
 | 视图页签 | — | ✅ 建 / 删 / 选 |
 | `DocumentManager` 信号 | ✅ 连接 | ✅ 连接 `documentActivated/Closed` |
 | 文档组合框 | ✅ 增删、激活 | — |
-| 状态栏 | ✅ 取 `currentEditor()->statusText()` | — |
+| 状态栏 | ✅ 由 `current()->path()` 与 `graph().moduleCount()` 拼装 | — |
 | 「关闭」动作 enable | ✅ `current() != nullptr` | — |
 | 语言切换 | ✅ `ui`、主页、菜单 | ✅ 页签标题与视图文本 |
 | 打开失败提示 | ✅ `QMessageBox` | — |
@@ -743,7 +733,7 @@ void EditorHost::showView(EditorView* view) {
 3. `EditorHost`：页签重建、页签→页面映射、`retranslateUi`；
 4. `PeViewer` 改为连接 `DocumentManager`，组合框、状态栏、关闭动作、错误提示；
 5. 删除 `ui.dependencyTree` 及相关代码（由视图接管）；
-6. 更新翻译：主页/视图页签标题、`PeEditor` 上下文的状态栏文本；
+6. 更新翻译：主页与视图页签标题；状态栏文案仍留在 `PeViewer` 上下文，无需新增条目；
 7. UI 测试按第 13 节补齐。
 
 提交信息：`feat: 文档视图以 Ribbon 页签呈现`。
@@ -782,7 +772,7 @@ void EditorHost::showView(EditorView* view) {
 | 用例 | 断言 |
 |---|---|
 | 无文档 | 页签只有主页；`viewStack` 当前页是 `homePage`；关闭动作置灰 |
-| 打开文档 | 页签 = 主页 + 视图；当前页是首个视图控件；状态栏为 `PeEditor::statusText()` |
+| 打开文档 | 页签 = 主页 + 视图；当前页是首个视图控件；状态栏为「已加载 …：N 个模块」 |
 | 点主页 | 页签切到主页，`viewStack` 当前页变 `homePage` |
 | 点回视图 | `viewStack` 回到该视图控件 |
 | 切文档 | 页签换新文档视图；显示其上次视图 |
@@ -805,6 +795,7 @@ void EditorHost::showView(EditorView* view) {
 | D7 | 无视图文档停在主页 + 状态栏提示 | 不引入第三种页面 | 也可以在 `homePage` 里显示提示 |
 | D8 | 视图注册在编译期（`main()` 注册） | 简单、可测；插件化不是当前需求 | 动态插件留到后续 `QPluginLoader` |
 | D9 | 每个文档记住上次视图（`m_lastView`） | 切回文档时体验一致，成本极低 | 不记忆则总是回到第一个视图 |
+| D10 | `Editor` 不提供 `statusText()`，状态栏由 `PeViewer` 生成 | 显示文案属于外壳职责；文档对象保持最小接口（身份 + 视图 + 关闭确认） | 放进 `Editor` 会让文档对象依赖 `QCoreApplication::translate`，并把 UI 文案耦合进数据侧 |
 
 ## 15. 后续扩展
 
