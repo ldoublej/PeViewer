@@ -717,11 +717,12 @@ void EditorHost::showView(EditorView* view) {
 ### P1 纯重命名（行为零变化，单独提交）
 
 1. `git mv src/workspace src/document`；`workspace.h/.cpp` → `document.h/.cpp`；`workspace_manager.*` → `document_manager.*`；
-2. 类名 `Workspace` → `Document`、`WorkspaceManager` → `DocumentManager`；信号 `workspaceOpened` → `documentOpened` 等；
+2. 类名 `Workspace` → `Document`、`WorkspaceManager` → `DocumentManager`；信号 `workspaceOpened` → `documentOpened` 等；`workspaces()` → `documents()`；
 3. `src/CMakeLists.txt`、`src/document/CMakeLists.txt`（target `document`）、`tests/CMakeLists.txt`（`WorkspaceTests` → `DocumentTests`）、`src/peviewer/CMakeLists.txt` 同步；
 4. `tests/workspace_tests.cpp` → `tests/document_tests.cpp`，`tests/pe_viewer_ui_tests.cpp` 里 `workspaceCombo` → `documentCombo`；
-5. 重写 `src/document/readme.md`，根 `readme.md` 的界面描述顺带更新；
-6. 验收：全量 `ctest` 通过，运行界面与之前完全一致。
+5. UI 文案同步：辅助名 `Workspace` → `Document`、占位符 `Search workspaces...` → `Search documents...`，`.ts` 更新为“文档 / 搜索文档...”；
+6. 重写 `src/document/readme.md`，根 `readme.md` 的“工作区”改为“文档”；
+7. 验收：全量 `ctest` 通过，界面布局与行为不变（仅组合框文案变为“文档”）。
 
 提交信息：`refactor: 重命名 Workspace 为 Document`。
 

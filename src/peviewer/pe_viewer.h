@@ -4,13 +4,13 @@
 
 #include "ui_pe_viewer.h"
 
+class Document;
 class LanguageManager;
 class QComboBox;
 class SARibbonApplicationButton;
 class SARibbonCategory;
 class SARibbonMenu;
 class SARibbonPanel;
-class Workspace;
 
 class PeViewer : public SARibbonMainWindow {
     Q_OBJECT
@@ -32,15 +32,15 @@ private:
     void setupFileMenu();
     void updateFileButtonWidth();
     void updateLanguageActions();
-    void addWorkspace(Workspace* workspace);
-    void removeWorkspace(Workspace* workspace);
-    void updateWorkspaceSelection();
-    void updateCurrentWorkspace(Workspace* workspace);
-    void updateWorkspaceStatus();
+    void addDocument(Document* document);
+    void removeDocument(Document* document);
+    void updateDocumentSelection();
+    void updateCurrentDocument(Document* document);
+    void updateDocumentStatus();
     void retranslateUi();
 
     LanguageManager& m_languageManager;
-    QComboBox* m_workspaceCombo = nullptr;
+    QComboBox* m_documentCombo = nullptr;
     SARibbonApplicationButton* m_applicationButton = nullptr;
     SARibbonMenu* m_fileMenu = nullptr;
     SARibbonCategory* m_homeCategory = nullptr;

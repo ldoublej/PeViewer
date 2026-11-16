@@ -26,8 +26,8 @@
 
 #include "dependency_graph.h"
 #include "language_manager.h"
-#include "workspace.h"
-#include "workspace_manager.h"
+#include "document.h"
+#include "document_manager.h"
 
 PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     : SARibbonMainWindow(parent), m_languageManager(languageManager) {
@@ -49,14 +49,14 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     connect(&m_languageManager, &LanguageManager::languageChanged, this,
             &PeViewer::updateLanguageActions);
 
-    auto* manager = WorkspaceManager::instance();
-    connect(manager, &WorkspaceManager::workspaceOpened, this, &PeViewer::addWorkspace);
-    connect(manager, &WorkspaceManager::workspaceClosed, this, &PeViewer::removeWorkspace);
-    connect(manager, &WorkspaceManager::workspaceActivated, this, &PeViewer::updateCurrentWorkspace);
-    for (const auto& workspace : manager->workspaces()) {
-        addWorkspace(workspace.get());
+    auto* manager = DocumentManager::instance();
+    connect(manager, &DocumentManager::documentOpened, this, &PeViewer::addDocument);
+    connect(manager, &DocumentManager::documentClosed, this, &PeViewer::removeDocument);
+    connect(manager, &DocumentManager::documentActivated, this, &PeViewer::updateCurrentDocument);
+    for (const auto& document : manager->documents()) {
+        addDocument(document.get());
     }
-    updateCurrentWorkspace(manager->current());
+    updateCurrentDocument(manager->current());
     retranslateUi();
     updateLanguageActions();
 }
@@ -75,35 +75,35 @@ void PeViewer::setupRibbon() {
     m_homeCategory = ribbon->addCategoryPage(tr("Home"));
     m_homeCategory->setObjectName(QStringLiteral("ribbonHome"));
 
-    m_workspaceCombo = new QComboBox(ribbon);
-    m_workspaceCombo->setObjectName(QStringLiteral("workspaceCombo"));
-    m_workspaceCombo->setEditable(true);
-    m_workspaceCombo->setInsertPolicy(QComboBox::NoInsert);
-    m_workspaceCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-    m_workspaceCombo->setFixedWidth(320);
-    m_workspaceCombo->setMaxVisibleItems(12);
-    auto* completer = m_workspaceCombo->completer();
+    m_documentCombo = new QComboBox(ribbon);
+    m_documentCombo->setObjectName(QStringLiteral("documentCombo"));
+    m_documentCombo->setEditable(true);
+    m_documentCombo->setInsertPolicy(QComboBox::NoInsert);
+    m_documentCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    m_documentCombo->setFixedWidth(320);
+    m_documentCombo->setMaxVisibleItems(12);
+    auto* completer = m_documentCombo->completer();
     completer->setCaseSensitivity(Qt::CaseInsensitive);
     completer->setFilterMode(Qt::MatchContains);
     completer->setCompletionMode(QCompleter::PopupCompletion);
     completer->setMaxVisibleItems(12);
     completer->popup()->installEventFilter(this);
-    ribbon->quickAccessBar()->addWidget(m_workspaceCombo);
-    setFramelessHitTestVisible(m_workspaceCombo);
-    setFramelessHitTestVisible(m_workspaceCombo->lineEdit());
-    m_workspaceCombo->installEventFilter(this);
-    m_workspaceCombo->lineEdit()->installEventFilter(this);
-    connect(m_workspaceCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
-        auto* manager = WorkspaceManager::instance();
-        const QString path = m_workspaceCombo->itemData(index).toString();
+    ribbon->quickAccessBar()->addWidget(m_documentCombo);
+    setFramelessHitTestVisible(m_documentCombo);
+    setFramelessHitTestVisible(m_documentCombo->lineEdit());
+    m_documentCombo->installEventFilter(this);
+    m_documentCombo->lineEdit()->installEventFilter(this);
+    connect(m_documentCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
+        auto* manager = DocumentManager::instance();
+        const QString path = m_documentCombo->itemData(index).toString();
         if (!path.isEmpty()) {
             manager->activate(manager->find(path));
         }
-        updateWorkspaceSelection();
+        updateDocumentSelection();
     });
-    connect(m_workspaceCombo->lineEdit(), &QLineEdit::editingFinished, this, [this] {
+    connect(m_documentCombo->lineEdit(), &QLineEdit::editingFinished, this, [this] {
         // Let completion activation finish before restoring a cancelled or invalid query.
-        QTimer::singleShot(0, this, &PeViewer::updateWorkspaceSelection);
+        QTimer::singleShot(0, this, &PeViewer::updateDocumentSelection);
     });
 
     m_languagePanel = m_homeCategory->addPanel(tr("Language"));
@@ -151,7 +151,7 @@ void PeViewer::on_actionOpen_triggered(bool b) {
         return;
     }
 
-    auto* manager = WorkspaceManager::instance();
+    auto* manager = DocumentManager::instance();
     try {
         manager->open(fileName);
     } catch (const std::exception& error) {
@@ -162,7 +162,7 @@ void PeViewer::on_actionOpen_triggered(bool b) {
 }
 
 void PeViewer::on_actionClose_triggered() {
-    auto* manager = WorkspaceManager::instance();
+    auto* manager = DocumentManager::instance();
     manager->close(manager->current());
 }
 
@@ -174,25 +174,25 @@ void PeViewer::changeEvent(QEvent* event) {
 }
 
 bool PeViewer::eventFilter(QObject* watched, QEvent* event) {
-    if (m_workspaceCombo &&
-        (watched == m_workspaceCombo || watched == m_workspaceCombo->lineEdit() ||
-         watched == m_workspaceCombo->completer()->popup())) {
+    if (m_documentCombo &&
+        (watched == m_documentCombo || watched == m_documentCombo->lineEdit() ||
+         watched == m_documentCombo->completer()->popup())) {
         if (event->type() == QEvent::KeyPress &&
             static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
-            m_workspaceCombo->hidePopup();
-            updateWorkspaceSelection();
+            m_documentCombo->hidePopup();
+            updateDocumentSelection();
             return true;
         }
         if (event->type() == QEvent::FocusIn &&
-            watched != m_workspaceCombo->completer()->popup()) {
-            QTimer::singleShot(0, m_workspaceCombo->lineEdit(), &QLineEdit::selectAll);
+            watched != m_documentCombo->completer()->popup()) {
+            QTimer::singleShot(0, m_documentCombo->lineEdit(), &QLineEdit::selectAll);
         }
         if (event->type() == QEvent::FocusOut ||
-            (watched == m_workspaceCombo->completer()->popup() && event->type() == QEvent::Hide)) {
+            (watched == m_documentCombo->completer()->popup() && event->type() == QEvent::Hide)) {
             QTimer::singleShot(0, this, [this] {
-                if (!m_workspaceCombo->hasFocus() && !m_workspaceCombo->lineEdit()->hasFocus() &&
-                    !m_workspaceCombo->completer()->popup()->isVisible()) {
-                    updateWorkspaceSelection();
+                if (!m_documentCombo->hasFocus() && !m_documentCombo->lineEdit()->hasFocus() &&
+                    !m_documentCombo->completer()->popup()->isVisible()) {
+                    updateDocumentSelection();
                 }
             });
         }
@@ -206,54 +206,54 @@ void PeViewer::retranslateUi() {
     m_applicationButton->setText(tr("File"));
     m_fileMenu->setTitle(tr("File"));
     updateFileButtonWidth();
-    m_workspaceCombo->setAccessibleName(tr("Workspace"));
-    m_workspaceCombo->lineEdit()->setPlaceholderText(tr("Search workspaces..."));
+    m_documentCombo->setAccessibleName(tr("Document"));
+    m_documentCombo->lineEdit()->setPlaceholderText(tr("Search documents..."));
     m_languagePanel->setPanelName(tr("Language"));
-    updateWorkspaceStatus();
-    updateWorkspaceSelection();
+    updateDocumentStatus();
+    updateDocumentSelection();
 }
 
-void PeViewer::addWorkspace(Workspace* workspace) {
-    const QString path = workspace->path();
+void PeViewer::addDocument(Document* document) {
+    const QString path = document->path();
     const QString displayPath = QDir::toNativeSeparators(path);
-    const QSignalBlocker blocker(m_workspaceCombo);
-    m_workspaceCombo->addItem(displayPath, path);
-    m_workspaceCombo->setItemData(m_workspaceCombo->count() - 1, displayPath, Qt::ToolTipRole);
-    updateWorkspaceSelection();
+    const QSignalBlocker blocker(m_documentCombo);
+    m_documentCombo->addItem(displayPath, path);
+    m_documentCombo->setItemData(m_documentCombo->count() - 1, displayPath, Qt::ToolTipRole);
+    updateDocumentSelection();
 }
 
-void PeViewer::removeWorkspace(Workspace* workspace) {
-    const QSignalBlocker blocker(m_workspaceCombo);
-    m_workspaceCombo->removeItem(m_workspaceCombo->findData(workspace->path()));
-    updateWorkspaceSelection();
+void PeViewer::removeDocument(Document* document) {
+    const QSignalBlocker blocker(m_documentCombo);
+    m_documentCombo->removeItem(m_documentCombo->findData(document->path()));
+    updateDocumentSelection();
 }
 
-void PeViewer::updateWorkspaceSelection() {
-    const QSignalBlocker blocker(m_workspaceCombo);
-    auto* current = WorkspaceManager::instance()->current();
-    const int index = current ? m_workspaceCombo->findData(current->path()) : -1;
-    m_workspaceCombo->completer()->popup()->hide();
-    m_workspaceCombo->setCurrentIndex(index);
+void PeViewer::updateDocumentSelection() {
+    const QSignalBlocker blocker(m_documentCombo);
+    auto* current = DocumentManager::instance()->current();
+    const int index = current ? m_documentCombo->findData(current->path()) : -1;
+    m_documentCombo->completer()->popup()->hide();
+    m_documentCombo->setCurrentIndex(index);
     // setCurrentIndex does not restore edited text when the index is unchanged.
-    m_workspaceCombo->setEditText(index >= 0 ? m_workspaceCombo->itemText(index) : QString());
-    m_workspaceCombo->setToolTip(current ? QDir::toNativeSeparators(current->path())
-                                        : tr("Search workspaces..."));
-    m_workspaceCombo->setEnabled(m_workspaceCombo->count() > 0);
+    m_documentCombo->setEditText(index >= 0 ? m_documentCombo->itemText(index) : QString());
+    m_documentCombo->setToolTip(current ? QDir::toNativeSeparators(current->path())
+                                        : tr("Search documents..."));
+    m_documentCombo->setEnabled(m_documentCombo->count() > 0);
 }
 
-void PeViewer::updateCurrentWorkspace(Workspace* workspace) {
-    ui.actionClose->setEnabled(workspace != nullptr);
-    updateWorkspaceSelection();
-    ui.dependencyTree->setGraph(workspace ? &workspace->graph() : nullptr);
-    updateWorkspaceStatus();
+void PeViewer::updateCurrentDocument(Document* document) {
+    ui.actionClose->setEnabled(document != nullptr);
+    updateDocumentSelection();
+    ui.dependencyTree->setGraph(document ? &document->graph() : nullptr);
+    updateDocumentStatus();
 }
 
-void PeViewer::updateWorkspaceStatus() {
-    if (auto* workspace = WorkspaceManager::instance()->current()) {
+void PeViewer::updateDocumentStatus() {
+    if (auto* document = DocumentManager::instance()->current()) {
         ui.statusBar->showMessage(
             tr("Loaded %1: %2 modules")
-                .arg(QFileInfo(workspace->path()).fileName())
-                .arg(static_cast<qulonglong>(workspace->graph().moduleCount())));
+                .arg(QFileInfo(document->path()).fileName())
+                .arg(static_cast<qulonglong>(document->graph().moduleCount())));
     } else {
         ui.statusBar->showMessage(tr("Ready"));
     }

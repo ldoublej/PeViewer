@@ -1,7 +1,7 @@
+#include <document.h>
+#include <document_manager.h>
 #include <pe_data_source.h>
 #include <pe_file.h>
-#include <workspace.h>
-#include <workspace_manager.h>
 
 #include <QDir>
 #include <QFileInfo>
@@ -16,9 +16,9 @@
 using namespace DependencyTests;
 
 namespace {
-static_assert(!std::is_default_constructible_v<WorkspaceManager>);
-static_assert(!std::is_copy_constructible_v<WorkspaceManager>);
-static_assert(!std::is_move_constructible_v<WorkspaceManager>);
+static_assert(!std::is_default_constructible_v<DocumentManager>);
+static_assert(!std::is_copy_constructible_v<DocumentManager>);
+static_assert(!std::is_move_constructible_v<DocumentManager>);
 
 QString writeFixture(const QDir& dir, const QString& name,
                      const QStringList& imports = QStringList{}) {
@@ -34,15 +34,15 @@ void opensSession() {
         writeFixture(dir, QStringLiteral("app.exe"), {QStringLiteral("a.dll")});
     writeFixture(dir, QStringLiteral("a.dll"));
 
-    Workspace workspace(path, FileLocatorOptions{});
-    require(workspace.path() == QFileInfo(path).absoluteFilePath(),
-            "Workspace did not record the absolute path");
-    require(workspace.peFile().isParsed(), "Workspace did not parse the root file");
-    require(&workspace.graph().root().pe_file() == &workspace.peFile(),
-            "Graph does not borrow the workspace root");
-    require(workspace.graph().moduleCount() == 2, "Dependency graph was not built");
-    require(workspace.files().size() == 1 && workspace.graph().files().size() == 1,
-            "Workspace does not expose its dependency store");
+    Document document(path, FileLocatorOptions{});
+    require(document.path() == QFileInfo(path).absoluteFilePath(),
+            "Document did not record the absolute path");
+    require(document.peFile().isParsed(), "Document did not parse the root file");
+    require(&document.graph().root().pe_file() == &document.peFile(),
+            "Graph does not borrow the document root");
+    require(document.graph().moduleCount() == 2, "Dependency graph was not built");
+    require(document.files().size() == 1 && document.graph().files().size() == 1,
+            "Document does not expose its dependency store");
 }
 
 void managerTracksList() {
@@ -56,52 +56,52 @@ void managerTracksList() {
         writeFixture(dir, QStringLiteral("second.exe"), {QStringLiteral("b.dll")});
     writeFixture(dir, QStringLiteral("b.dll"));
 
-    auto* manager = WorkspaceManager::instance();
-    require(manager == WorkspaceManager::instance(), "Manager is not a singleton");
+    auto* manager = DocumentManager::instance();
+    require(manager == DocumentManager::instance(), "Manager is not a singleton");
     require(manager->current() == nullptr && manager->empty() && manager->size() == 0,
             "Manager is not empty");
 
-    Workspace* first = manager->open(firstPath);
+    Document* first = manager->open(firstPath);
     require(first != nullptr && manager->current() == first && manager->size() == 1,
-            "Manager did not open a workspace");
-    require(WorkspaceManager::instance()->find(firstPath) == first,
-            "Singleton access did not share the workspace list");
-    require(first->graph().moduleCount() == 2, "First workspace graph is incomplete");
+            "Manager did not open a document");
+    require(DocumentManager::instance()->find(firstPath) == first,
+            "Singleton access did not share the document list");
+    require(first->graph().moduleCount() == 2, "First document graph is incomplete");
 
-    Workspace* second = manager->open(secondPath);
+    Document* second = manager->open(secondPath);
     require(second != nullptr && second != first && manager->current() == second,
-            "Manager did not activate the new workspace");
-    require(manager->size() == 2 && manager->workspaces()[0].get() == first,
-            "Manager did not keep the previous workspace");
+            "Manager did not activate the new document");
+    require(manager->size() == 2 && manager->documents()[0].get() == first,
+            "Manager did not keep the previous document");
 
     // Reopening an already-open path activates it instead of duplicating it.
     require(manager->open(firstPath) == first && manager->current() == first &&
                 manager->size() == 2,
-            "Reopening a path duplicated the workspace");
-    require(manager->find(secondPath) == second, "find() did not locate the workspace");
+            "Reopening a path duplicated the document");
+    require(manager->find(secondPath) == second, "find() did not locate the document");
 
     // A failed open must keep the list and the current session intact.
     expectException<PeDataSourceError>(
         [&] { manager->open(dir.filePath(QStringLiteral("missing.exe"))); });
     require(manager->current() == first && manager->size() == 2,
-            "Failed open changed the workspace list");
+            "Failed open changed the document list");
 
     writeFile(dir.filePath(QStringLiteral("bad.exe")), QByteArray("invalid PE"));
     expectException<ParseError>(
         [&] { manager->open(dir.filePath(QStringLiteral("bad.exe"))); });
     require(manager->current() == first && manager->size() == 2,
-            "Failed parse changed the workspace list");
+            "Failed parse changed the document list");
 
     require(manager->activate(second) && manager->current() == second,
-            "activate() did not change the current workspace");
-    require(!manager->activate(nullptr), "activate() accepted an unknown workspace");
+            "activate() did not change the current document");
+    require(!manager->activate(nullptr), "activate() accepted an unknown document");
 
     require(manager->close(second) && manager->size() == 1 && manager->current() == first,
-            "Closing the current workspace did not activate another one");
-    require(!manager->close(second), "close() accepted a removed workspace");
+            "Closing the current document did not activate another one");
+    require(!manager->close(second), "close() accepted a removed document");
 
     manager->closeAll();
-    require(manager->empty() && manager->current() == nullptr, "closeAll() kept workspaces");
+    require(manager->empty() && manager->current() == nullptr, "closeAll() kept documents");
 }
 
 void managerSignalsAndOpenModes() {
@@ -111,69 +111,69 @@ void managerSignalsAndOpenModes() {
     const QString firstPath = writeFixture(dir, QStringLiteral("first.exe"));
     const QString secondPath = writeFixture(dir, QStringLiteral("second.exe"));
 
-    auto* manager = WorkspaceManager::instance();
-    using OpenMode = WorkspaceManager::OpenMode;
+    auto* manager = DocumentManager::instance();
+    using OpenMode = DocumentManager::OpenMode;
     std::vector<QString> events;
     QObject context;
-    QObject::connect(manager, &WorkspaceManager::workspaceOpened, &context,
-                     [&](Workspace* workspace) {
-                         require(manager->find(workspace->path()) == workspace,
+    QObject::connect(manager, &DocumentManager::documentOpened, &context,
+                     [&](Document* document) {
+                         require(manager->find(document->path()) == document,
                                  "Opened signal preceded insertion");
                          events.push_back(QStringLiteral("opened:") +
-                                          QFileInfo(workspace->path()).fileName());
+                                          QFileInfo(document->path()).fileName());
                      });
-    QObject::connect(manager, &WorkspaceManager::workspaceActivated, &context,
-                     [&](Workspace* workspace) {
-                         require(manager->current() == workspace,
+    QObject::connect(manager, &DocumentManager::documentActivated, &context,
+                     [&](Document* document) {
+                         require(manager->current() == document,
                                  "Activated signal preceded current change");
                          events.push_back(QStringLiteral("activated:") +
-                                          (workspace ? QFileInfo(workspace->path()).fileName()
+                                          (document ? QFileInfo(document->path()).fileName()
                                                      : QStringLiteral("none")));
                      });
-    QObject::connect(manager, &WorkspaceManager::workspaceClosed, &context,
-                     [&](Workspace* workspace) {
-                         require(manager->find(workspace->path()) == nullptr &&
-                                     manager->current() != workspace,
+    QObject::connect(manager, &DocumentManager::documentClosed, &context,
+                     [&](Document* document) {
+                         require(manager->find(document->path()) == nullptr &&
+                                     manager->current() != document,
                                  "Closed signal preceded removal");
-                         require(workspace->peFile().isParsed(),
-                                 "Closed workspace is not readable during signal delivery");
+                         require(document->peFile().isParsed(),
+                                 "Closed document is not readable during signal delivery");
                          events.push_back(QStringLiteral("closed:") +
-                                          QFileInfo(workspace->path()).fileName());
+                                          QFileInfo(document->path()).fileName());
                      });
     const auto expectEvents = [&](const std::vector<QString>& expected) {
-        require(events == expected, "Unexpected workspace signals or signal order");
+        require(events == expected, "Unexpected document signals or signal order");
         events.clear();
     };
 
-    Workspace* first = manager->open(firstPath, OpenMode::OpenOnly);
-    require(manager->current() == nullptr, "OpenOnly activated the first workspace");
+    Document* first = manager->open(firstPath, OpenMode::OpenOnly);
+    require(manager->current() == nullptr, "OpenOnly activated the first document");
     expectEvents({QStringLiteral("opened:first.exe")});
     require(manager->open(firstPath, OpenMode::OpenOnly) == first,
-            "OpenOnly duplicated an existing workspace");
+            "OpenOnly duplicated an existing document");
     expectEvents({});
 
-    Workspace* second = manager->open(secondPath, OpenMode::OpenOnly);
-    require(manager->current() == nullptr, "OpenOnly changed the current workspace");
+    Document* second = manager->open(secondPath, OpenMode::OpenOnly);
+    require(manager->current() == nullptr, "OpenOnly changed the current document");
     expectEvents({QStringLiteral("opened:second.exe")});
     require(manager->close(first) && manager->current() == nullptr,
-            "Closing an inactive workspace activated another one");
+            "Closing an inactive document activated another one");
     expectEvents({QStringLiteral("closed:first.exe")});
 
-    require(manager->activate(second), "Could not activate an opened workspace");
+    require(manager->activate(second), "Could not activate an opened document");
     expectEvents({QStringLiteral("activated:second.exe")});
     require(manager->activate(second), "Repeated activation failed");
     require(!manager->activate(nullptr), "Null activation succeeded");
     expectEvents({});
 
     first = manager->open(firstPath, OpenMode::OpenAndActivate);
-    require(manager->current() == first, "OpenAndActivate did not activate the workspace");
+    require(manager->current() == first, "OpenAndActivate did not activate the document");
     expectEvents({QStringLiteral("opened:first.exe"), QStringLiteral("activated:first.exe")});
     require(manager->open(secondPath, OpenMode::OpenOnly) == second &&
                 manager->current() == first,
-            "Reopening with OpenOnly changed the current workspace");
+            "Reopening with OpenOnly changed the current document");
     expectEvents({});
     require(manager->open(secondPath) == second && manager->current() == second,
-            "Default open did not activate an existing workspace");
+            "Default open did not activate an existing document");
     expectEvents({QStringLiteral("activated:second.exe")});
     manager->open(secondPath);
     expectEvents({});
@@ -187,12 +187,12 @@ void managerSignalsAndOpenModes() {
             "Failed open changed the manager");
     expectEvents({});
 
-    require(manager->close(first), "Could not close an inactive workspace");
+    require(manager->close(first), "Could not close an inactive document");
     expectEvents({QStringLiteral("closed:first.exe")});
     require(manager->close(second) && manager->current() == nullptr,
-            "Closing the last workspace kept it active");
+            "Closing the last document kept it active");
     expectEvents({QStringLiteral("activated:none"), QStringLiteral("closed:second.exe")});
-    require(!manager->close(nullptr), "Closing an unknown workspace succeeded");
+    require(!manager->close(nullptr), "Closing an unknown document succeeded");
     expectEvents({});
 
     first = manager->open(firstPath);
@@ -200,12 +200,12 @@ void managerSignalsAndOpenModes() {
     expectEvents({QStringLiteral("opened:first.exe"), QStringLiteral("activated:first.exe"),
                   QStringLiteral("opened:second.exe"), QStringLiteral("activated:second.exe")});
     require(manager->close(second) && manager->current() == first,
-            "Closing the current workspace did not activate the remaining one");
+            "Closing the current document did not activate the remaining one");
     expectEvents({QStringLiteral("activated:first.exe"), QStringLiteral("closed:second.exe")});
     manager->open(secondPath, OpenMode::OpenOnly);
     expectEvents({QStringLiteral("opened:second.exe")});
     manager->closeAll();
-    require(manager->empty() && manager->current() == nullptr, "closeAll() kept workspaces");
+    require(manager->empty() && manager->current() == nullptr, "closeAll() kept documents");
     expectEvents({QStringLiteral("activated:none"), QStringLiteral("closed:first.exe"),
                   QStringLiteral("closed:second.exe")});
     manager->closeAll();
@@ -214,7 +214,7 @@ void managerSignalsAndOpenModes() {
     manager->open(firstPath, OpenMode::OpenOnly);
     manager->open(secondPath, OpenMode::OpenOnly);
     manager->closeAll();
-    require(manager->current() == nullptr, "Closing inactive workspaces activated one");
+    require(manager->current() == nullptr, "Closing inactive documents activated one");
     expectEvents({QStringLiteral("opened:first.exe"), QStringLiteral("opened:second.exe"),
                   QStringLiteral("closed:first.exe"), QStringLiteral("closed:second.exe")});
 }

@@ -13,13 +13,13 @@ class PeFileDataSource;
 // One opened session: owns the root file, its data source, the dependency files
 // and the graph built from them. Construction loads and parses the file, then
 // builds the dependency graph; failures are reported as exceptions.
-class Workspace {
+class Document {
 public:
-    explicit Workspace(const QString& path,
-                       FileLocatorOptions options = FileLocatorOptions::systemDefaults());
-    ~Workspace();
+    explicit Document(const QString& path,
+                      FileLocatorOptions options = FileLocatorOptions::systemDefaults());
+    ~Document();
 
-    Q_DISABLE_COPY_MOVE(Workspace)
+    Q_DISABLE_COPY_MOVE(Document)
 
     // Absolute path of the opened file.
     const QString& path() const { return m_path; }

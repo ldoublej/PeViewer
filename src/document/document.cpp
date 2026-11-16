@@ -1,4 +1,4 @@
-#include "workspace.h"
+#include "document.h"
 
 #include <QFileInfo>
 #include <utility>
@@ -7,7 +7,7 @@
 #include "pe_file.h"
 #include "pe_file_data_source.h"
 
-Workspace::Workspace(const QString& path, FileLocatorOptions options)
+Document::Document(const QString& path, FileLocatorOptions options)
     : m_path(QFileInfo(path).absoluteFilePath()),
       m_dataSource(std::make_unique<PeFileDataSource>(path)),
       m_peFile(std::make_unique<PeFile>(*m_dataSource)) {
@@ -16,8 +16,8 @@ Workspace::Workspace(const QString& path, FileLocatorOptions options)
     m_graph->build();
 }
 
-Workspace::~Workspace() = default;
+Document::~Document() = default;
 
-const PeFile& Workspace::peFile() const { return *m_peFile; }
+const PeFile& Document::peFile() const { return *m_peFile; }
 
-const DependencyGraph& Workspace::graph() const { return *m_graph; }
+const DependencyGraph& Document::graph() const { return *m_graph; }

@@ -25,10 +25,10 @@
 #include <stdexcept>
 
 #include "dependencies_test_support.h"
+#include "document.h"
+#include "document_manager.h"
 #include "language_manager.h"
 #include "pe_viewer.h"
-#include "workspace.h"
-#include "workspace_manager.h"
 
 namespace {
 void require(bool condition, const char* message) {
@@ -50,11 +50,11 @@ void testLanguageSwitching() {
         auto* openAction = window.findChild<QAction*>(QStringLiteral("actionOpen"));
         auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
         auto* home = window.findChild<SARibbonCategory*>(QStringLiteral("ribbonHome"));
-        auto* workspaceCombo = window.findChild<QComboBox*>(QStringLiteral("workspaceCombo"));
+        auto* documentCombo = window.findChild<QComboBox*>(QStringLiteral("documentCombo"));
         auto* english = window.findChild<QAction*>(QStringLiteral("actionEnglish"));
         auto* chinese = window.findChild<QAction*>(QStringLiteral("actionSimplifiedChinese"));
         require(languagePanel && applicationButton && fileMenu && openAction && closeAction &&
-                    home && workspaceCombo && english && chinese &&
+                    home && documentCombo && english && chinese &&
                     window.menuWidget() == window.ribbonBar(),
                 "Ribbon is incomplete or not installed as the menu widget");
         require(applicationButton->menu() == fileMenu && fileMenu->actions().contains(openAction) &&
@@ -75,9 +75,9 @@ void testLanguageSwitching() {
                     applicationButton->text() == QStringLiteral("File") &&
                     languagePanel->panelName() == QStringLiteral("Language"),
                 "English Ribbon labels are incorrect");
-        require(workspaceCombo->accessibleName() == QStringLiteral("Workspace") &&
-                    workspaceCombo->lineEdit()->placeholderText() == QStringLiteral("Search workspaces..."),
-                "English workspace selector is incorrect");
+        require(documentCombo->accessibleName() == QStringLiteral("Document") &&
+                    documentCombo->lineEdit()->placeholderText() == QStringLiteral("Search documents..."),
+                "English document selector is incorrect");
         require(window.statusBar()->currentMessage() == QStringLiteral("Ready"),
                 "English status is incorrect");
         require(english->isChecked() && !chinese->isChecked(), "English selection is incorrect");
@@ -92,9 +92,9 @@ void testLanguageSwitching() {
                     closeAction->text() == QStringLiteral("关闭") &&
                     languagePanel->panelName() == QStringLiteral("语言"),
                 "Ribbon labels were not retranslated");
-        require(workspaceCombo->accessibleName() == QStringLiteral("工作区") &&
-                    workspaceCombo->lineEdit()->placeholderText() == QStringLiteral("搜索工作区..."),
-                "Workspace selector was not retranslated");
+        require(documentCombo->accessibleName() == QStringLiteral("文档") &&
+                    documentCombo->lineEdit()->placeholderText() == QStringLiteral("搜索文档..."),
+                "Document selector was not retranslated");
         require(window.statusBar()->currentMessage() == QStringLiteral("就绪"),
                 "C++ text was not retranslated");
         require(chinese->isChecked() && !english->isChecked(), "Chinese selection is incorrect");
@@ -147,20 +147,20 @@ void pressKey(QWidget* widget, int key, const QString& text = QString()) {
     QApplication::processEvents();
 }
 
-void selectWorkspace(QComboBox* combo, int row) {
+void selectDocument(QComboBox* combo, int row) {
     combo->showPopup();
     combo->view()->setCurrentIndex(combo->model()->index(row, 0));
     pressKey(combo->view(), Qt::Key_Return);
 }
 
-void searchWorkspaces(QComboBox* combo, const QString& query) {
+void searchDocuments(QComboBox* combo, const QString& query) {
     combo->setFocus();
     QApplication::processEvents();
     combo->lineEdit()->selectAll();
     pressKey(combo->lineEdit(), 0, query);
 }
 
-void testWorkspaceSelector() {
+void testDocumentSelector() {
     QTemporaryDir temporary;
     require(temporary.isValid(), "Temporary directory failed");
     const QDir firstDir(temporary.path() + QStringLiteral("/left&part"));
@@ -177,130 +177,130 @@ void testWorkspaceSelector() {
     PeViewer window(languages);
     window.show();
     QApplication::processEvents();
-    auto* manager = WorkspaceManager::instance();
-    auto* combo = window.findChild<QComboBox*>(QStringLiteral("workspaceCombo"));
+    auto* manager = DocumentManager::instance();
+    auto* combo = window.findChild<QComboBox*>(QStringLiteral("documentCombo"));
     auto* tree = window.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
     auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
     auto* fileMenu = window.findChild<SARibbonMenu*>(QStringLiteral("ribbonFileMenu"));
     auto* fileButton = window.findChild<SARibbonApplicationButton*>(QStringLiteral("ribbonApplicationButton"));
     require(combo && tree && closeAction && fileMenu && fileButton &&
                 fileMenu->actions().contains(closeAction),
-            "Workspace selector, dependency tree or file menu is missing");
+            "Document selector, dependency tree or file menu is missing");
     require(fileButton->width() - fileButton->fontMetrics().horizontalAdvance(fileButton->text()) <= 40,
             "File button is much wider than its text");
     require(combo->parentWidget() == window.ribbonBar()->quickAccessBar(),
-            "Workspace selector is not in the title bar");
+            "Document selector is not in the title bar");
     const QPoint comboTop = combo->mapTo(window.ribbonBar(), QPoint());
     require(comboTop.y() >= 0 && comboTop.y() + combo->height() <= window.ribbonBar()->titleBarHeight(),
-            "Workspace selector extends outside the title bar");
+            "Document selector extends outside the title bar");
     require(combo->count() == 0 && combo->currentIndex() == -1 && !combo->isEnabled() &&
-                !closeAction->isEnabled(), "Empty workspace controls are enabled or selected");
+                !closeAction->isEnabled(), "Empty document controls are enabled or selected");
 
-    Workspace* first = manager->open(firstPath, WorkspaceManager::OpenMode::OpenOnly);
+    Document* first = manager->open(firstPath, DocumentManager::OpenMode::OpenOnly);
     require(combo->isEnabled() && combo->count() == 1 && combo->currentIndex() == -1 &&
                 combo->currentText().isEmpty() && !closeAction->isEnabled() && tree->model()->rowCount() == 0,
-            "OpenOnly selected or displayed a workspace");
+            "OpenOnly selected or displayed a document");
     require(combo->itemData(0).toString() == firstPath &&
                 combo->itemText(0) == QDir::toNativeSeparators(firstPath),
-            "Workspace path is missing or its ampersand was changed");
-    selectWorkspace(combo, 0);
+            "Document path is missing or its ampersand was changed");
+    selectDocument(combo, 0);
     require(manager->current() == first && combo->currentData().toString() == firstPath &&
                 closeAction->isEnabled() && tree->model()->index(0, 2).data().toString() == firstIdentity,
-            "Selecting a workspace did not activate and display it");
+            "Selecting a document did not activate and display it");
     require(window.statusBar()->currentMessage() == QStringLiteral("Loaded app.exe: 1 modules"),
-            "Workspace activation did not update the status");
+            "Document activation did not update the status");
 
-    Workspace* second = manager->open(secondPath);
+    Document* second = manager->open(secondPath);
     require(combo->count() == 2 && combo->currentData().toString() == secondPath &&
                 combo->itemText(0) != combo->itemText(1) &&
                 tree->model()->index(0, 2).data().toString() == secondIdentity,
-            "Workspaces with the same filename cannot be distinguished");
-    searchWorkspaces(combo, QStringLiteral("LEFT&PART"));
+            "Documents with the same filename cannot be distinguished");
+    searchDocuments(combo, QStringLiteral("LEFT&PART"));
     auto* completer = combo->completer();
     require(manager->current() == second && completer->completionCount() == 1 &&
-                completer->popup()->isVisible(), "Typing did not filter paths without switching workspaces");
+                completer->popup()->isVisible(), "Typing did not filter paths without switching documents");
     completer->popup()->setCurrentIndex(completer->completionModel()->index(0, 0));
     pressKey(completer->popup(), Qt::Key_Return);
     require(manager->current() == first && combo->currentData().toString() == firstPath &&
                 combo->currentText() == QDir::toNativeSeparators(firstPath) &&
                 tree->model()->index(0, 2).data().toString() == firstIdentity,
-            "Selecting a filtered result did not activate the correct workspace");
-    searchWorkspaces(combo, QStringLiteral("RIGHT"));
-    require(completer->completionCount() == 1, "Second workspace did not match the query");
+            "Selecting a filtered result did not activate the correct document");
+    searchDocuments(combo, QStringLiteral("RIGHT"));
+    require(completer->completionCount() == 1, "Second document did not match the query");
     completer->popup()->setCurrentIndex(completer->completionModel()->index(0, 0));
     pressKey(completer->popup(), Qt::Key_Return);
     require(manager->current() == second && combo->currentData().toString() == secondPath,
-            "Filtered row zero was not mapped to the correct source workspace");
+            "Filtered row zero was not mapped to the correct source document");
     manager->activate(first);
 
-    searchWorkspaces(combo, QStringLiteral("APP.EXE"));
-    require(completer->completionCount() == 2, "Filename search did not include all matching workspaces");
+    searchDocuments(combo, QStringLiteral("APP.EXE"));
+    require(completer->completionCount() == 2, "Filename search did not include all matching documents");
     pressKey(completer->popup(), Qt::Key_Escape);
     require(!completer->popup()->isVisible() && manager->current() == first &&
                 combo->currentText() == QDir::toNativeSeparators(firstPath),
-            "Escape did not cancel search and restore the active workspace");
-    searchWorkspaces(combo, QStringLiteral("missing-workspace"));
+            "Escape did not cancel search and restore the active document");
+    searchDocuments(combo, QStringLiteral("missing-document"));
     require(completer->completionCount() == 0 && manager->current() == first,
-            "An unmatched query changed the current workspace");
+            "An unmatched query changed the current document");
     pressKey(combo->lineEdit(), Qt::Key_Return);
     require(combo->count() == 2 && combo->currentText() == QDir::toNativeSeparators(firstPath),
-            "Invalid input inserted a workspace or left stale text");
-    searchWorkspaces(combo, QStringLiteral("left"));
+            "Invalid input inserted a document or left stale text");
+    searchDocuments(combo, QStringLiteral("left"));
     // An outside click dismisses the native popup before focus moves to the tree.
     completer->popup()->hide();
     tree->setFocus();
     QApplication::processEvents();
     require(manager->current() == first && combo->currentText() == QDir::toNativeSeparators(firstPath),
-            "Leaving the search field did not restore the current workspace");
+            "Leaving the search field did not restore the current document");
     manager->open(firstPath);
-    require(combo->count() == 2, "Reopening a workspace duplicated its item");
+    require(combo->count() == 2, "Reopening a document duplicated its item");
 
     {
         PeViewer otherWindow(languages);
-        auto* otherCombo = otherWindow.findChild<QComboBox*>(QStringLiteral("workspaceCombo"));
+        auto* otherCombo = otherWindow.findChild<QComboBox*>(QStringLiteral("documentCombo"));
         auto* otherTree = otherWindow.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
         require(otherCombo && otherTree && otherCombo->count() == 2 &&
                     otherCombo->currentData().toString() == firstPath &&
                     otherTree->model()->index(0, 2).data().toString() == firstIdentity,
-                "New window did not load existing workspaces");
+                "New window did not load existing documents");
         otherWindow.show();
         QApplication::processEvents();
-        selectWorkspace(otherCombo, otherCombo->findData(secondPath));
+        selectDocument(otherCombo, otherCombo->findData(secondPath));
         require(manager->current() == second && combo->currentData().toString() == secondPath &&
                     tree->model()->index(0, 2).data().toString() == secondIdentity,
-                "Workspace activation was not synchronized between windows");
+                "Document activation was not synchronized between windows");
     }
 
     require(languages.setLanguage(QStringLiteral("zh_CN")), "Could not switch to Chinese");
     QApplication::processEvents();
-    require(combo->lineEdit()->placeholderText() == QStringLiteral("搜索工作区...") &&
+    require(combo->lineEdit()->placeholderText() == QStringLiteral("搜索文档...") &&
                 combo->currentData().toString() == secondPath &&
                 window.statusBar()->currentMessage() == QStringLiteral("已加载 app.exe：1 个模块"),
-            "Language switching lost the active workspace or its translated status");
+            "Language switching lost the active document or its translated status");
     closeAction->trigger();
     require(manager->current() == first && combo->count() == 1 &&
                 combo->currentData().toString() == firstPath && closeAction->isEnabled() &&
                 tree->model()->index(0, 2).data().toString() == firstIdentity,
-            "Closing the current workspace did not select and display the fallback");
-    second = manager->open(secondPath, WorkspaceManager::OpenMode::OpenOnly);
+            "Closing the current document did not select and display the fallback");
+    second = manager->open(secondPath, DocumentManager::OpenMode::OpenOnly);
     require(combo->count() == 2 && combo->currentData().toString() == firstPath,
-            "Opening an inactive workspace changed the selection");
-    searchWorkspaces(combo, QStringLiteral("right"));
+            "Opening an inactive document changed the selection");
+    searchDocuments(combo, QStringLiteral("right"));
     require(manager->close(second) && combo->count() == 1 &&
                 combo->currentData().toString() == firstPath &&
                 !completer->popup()->isVisible(),
             "Closing a search result did not clear the stale popup and preserve selection");
-    manager->open(secondPath, WorkspaceManager::OpenMode::OpenOnly);
+    manager->open(secondPath, DocumentManager::OpenMode::OpenOnly);
     manager->closeAll();
     require(combo->count() == 0 && combo->currentIndex() == -1 && combo->currentText().isEmpty() &&
                 !combo->isEnabled() && !closeAction->isEnabled() && tree->model()->rowCount() == 0 &&
                 window.statusBar()->currentMessage() == QStringLiteral("就绪"),
-            "Closing all workspaces did not clear the selector and dependency tree");
+            "Closing all documents did not clear the selector and dependency tree");
     manager->open(firstPath);
     closeAction->trigger();
     require(manager->empty() && combo->count() == 0 && !combo->isEnabled() &&
                 !closeAction->isEnabled() && tree->model()->rowCount() == 0,
-            "Closing the final workspace did not disable workspace controls");
+            "Closing the final document did not disable document controls");
     QSettings().remove(QStringLiteral("ui/language"));
 }
 }  // namespace
@@ -319,7 +319,7 @@ int main(int argc, char* argv[]) {
 
     try {
         testLanguageSwitching();
-        testWorkspaceSelector();
+        testDocumentSelector();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

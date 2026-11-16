@@ -13,9 +13,9 @@ foreach(test IN ITEMS api_set module_locator dependency_graph pe_file_store)
     add_test(NAME ${test}_tests COMMAND ${test}_tests)
 endforeach()
 
-add_executable(WorkspaceTests workspace_tests.cpp)
-target_link_libraries(WorkspaceTests PRIVATE workspace)
-add_test(NAME WorkspaceTests COMMAND WorkspaceTests)
+add_executable(DocumentTests document_tests.cpp)
+target_link_libraries(DocumentTests PRIVATE document)
+add_test(NAME DocumentTests COMMAND DocumentTests)
 
 add_executable(DependencyTreeModelTests
     dependency_tree_model_tests.cpp
@@ -55,7 +55,7 @@ add_executable(PeViewerUiTests
 )
 set_target_properties(PeViewerUiTests PROPERTIES AUTORCC ON)
 target_include_directories(PeViewerUiTests PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
-target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets workspace SARibbonBar::SARibbonBar)
+target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets document SARibbonBar::SARibbonBar)
 add_dependencies(PeViewerUiTests peviewer_translations)
 add_test(NAME PeViewerUiTests COMMAND PeViewerUiTests)
 set_tests_properties(PeViewerUiTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
