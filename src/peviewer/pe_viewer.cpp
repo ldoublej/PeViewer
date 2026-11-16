@@ -1,17 +1,24 @@
 #include "pe_viewer.h"
 
+#include <QAbstractItemView>
 #include <QActionGroup>
+#include <QComboBox>
+#include <QCompleter>
 #include <QDir>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QKeyEvent>
+#include <QLineEdit>
 #include <QMessageBox>
-#include <QMenu>
+#include <QSignalBlocker>
 #include <QStyle>
+#include <QTimer>
 
 #include <SARibbonBar.h>
 #include <SARibbonCategory.h>
 #include <SARibbonPanel.h>
+#include <SARibbonQuickAccessBar.h>
 
 #include "dependency_graph.h"
 #include "language_manager.h"
@@ -38,16 +45,13 @@ PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     connect(&m_languageManager, &LanguageManager::languageChanged, this,
             &PeViewer::updateLanguageActions);
 
-    m_workspaceActions = new QActionGroup(this);
-    m_workspaceActions->setExclusive(true);
     auto* manager = WorkspaceManager::instance();
-    connect(manager, &WorkspaceManager::workspaceOpened, this, &PeViewer::addWorkspaceAction);
-    connect(manager, &WorkspaceManager::workspaceClosed, this, &PeViewer::removeWorkspaceAction);
+    connect(manager, &WorkspaceManager::workspaceOpened, this, &PeViewer::addWorkspace);
+    connect(manager, &WorkspaceManager::workspaceClosed, this, &PeViewer::removeWorkspace);
     connect(manager, &WorkspaceManager::workspaceActivated, this, &PeViewer::updateCurrentWorkspace);
     for (const auto& workspace : manager->workspaces()) {
-        addWorkspaceAction(workspace.get());
+        addWorkspace(workspace.get());
     }
-    m_workspaceMenu->setEnabled(!manager->empty());
     updateCurrentWorkspace(manager->current());
     retranslateUi();
     updateLanguageActions();
@@ -73,12 +77,36 @@ void PeViewer::setupRibbon() {
     m_filePanel->addLargeAction(ui.actionOpen);
     m_filePanel->addLargeAction(ui.actionClose);
 
-    m_workspacePanel = m_homeCategory->addPanel(tr("Workspace"));
-    m_workspacePanel->setObjectName(QStringLiteral("ribbonWorkspace"));
-    m_workspaceMenu = new QMenu(tr("Switch workspace"), this);
-    m_workspaceMenu->setObjectName(QStringLiteral("menuWorkspace"));
-    m_workspaceMenu->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
-    m_workspacePanel->addLargeMenu(m_workspaceMenu);
+    m_workspaceCombo = new QComboBox(ribbon);
+    m_workspaceCombo->setObjectName(QStringLiteral("workspaceCombo"));
+    m_workspaceCombo->setEditable(true);
+    m_workspaceCombo->setInsertPolicy(QComboBox::NoInsert);
+    m_workspaceCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    m_workspaceCombo->setFixedWidth(320);
+    m_workspaceCombo->setMaxVisibleItems(12);
+    auto* completer = m_workspaceCombo->completer();
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    completer->setFilterMode(Qt::MatchContains);
+    completer->setCompletionMode(QCompleter::PopupCompletion);
+    completer->setMaxVisibleItems(12);
+    completer->popup()->installEventFilter(this);
+    ribbon->quickAccessBar()->addWidget(m_workspaceCombo);
+    setFramelessHitTestVisible(m_workspaceCombo);
+    setFramelessHitTestVisible(m_workspaceCombo->lineEdit());
+    m_workspaceCombo->installEventFilter(this);
+    m_workspaceCombo->lineEdit()->installEventFilter(this);
+    connect(m_workspaceCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
+        auto* manager = WorkspaceManager::instance();
+        const QString path = m_workspaceCombo->itemData(index).toString();
+        if (!path.isEmpty()) {
+            manager->activate(manager->find(path));
+        }
+        updateWorkspaceSelection();
+    });
+    connect(m_workspaceCombo->lineEdit(), &QLineEdit::editingFinished, this, [this] {
+        // Let completion activation finish before restoring a cancelled or invalid query.
+        QTimer::singleShot(0, this, &PeViewer::updateWorkspaceSelection);
+    });
 
     m_languagePanel = m_homeCategory->addPanel(tr("Language"));
     m_languagePanel->setObjectName(QStringLiteral("ribbonLanguage"));
@@ -115,49 +143,75 @@ void PeViewer::changeEvent(QEvent* event) {
     }
 }
 
+bool PeViewer::eventFilter(QObject* watched, QEvent* event) {
+    if (m_workspaceCombo &&
+        (watched == m_workspaceCombo || watched == m_workspaceCombo->lineEdit() ||
+         watched == m_workspaceCombo->completer()->popup())) {
+        if (event->type() == QEvent::KeyPress &&
+            static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
+            m_workspaceCombo->hidePopup();
+            updateWorkspaceSelection();
+            return true;
+        }
+        if (event->type() == QEvent::FocusIn &&
+            watched != m_workspaceCombo->completer()->popup()) {
+            QTimer::singleShot(0, m_workspaceCombo->lineEdit(), &QLineEdit::selectAll);
+        }
+        if (event->type() == QEvent::FocusOut ||
+            (watched == m_workspaceCombo->completer()->popup() && event->type() == QEvent::Hide)) {
+            QTimer::singleShot(0, this, [this] {
+                if (!m_workspaceCombo->hasFocus() && !m_workspaceCombo->lineEdit()->hasFocus() &&
+                    !m_workspaceCombo->completer()->popup()->isVisible()) {
+                    updateWorkspaceSelection();
+                }
+            });
+        }
+    }
+    return SARibbonMainWindow::eventFilter(watched, event);
+}
+
 void PeViewer::retranslateUi() {
     ui.retranslateUi(this);
     m_homeCategory->setCategoryName(tr("Home"));
     m_filePanel->setPanelName(tr("File"));
-    m_workspacePanel->setPanelName(tr("Workspace"));
-    m_workspaceMenu->setTitle(tr("Switch workspace"));
+    m_workspaceCombo->setAccessibleName(tr("Workspace"));
+    m_workspaceCombo->lineEdit()->setPlaceholderText(tr("Search workspaces..."));
     m_languagePanel->setPanelName(tr("Language"));
     updateWorkspaceStatus();
+    updateWorkspaceSelection();
 }
 
-void PeViewer::addWorkspaceAction(Workspace* workspace) {
+void PeViewer::addWorkspace(Workspace* workspace) {
     const QString path = workspace->path();
     const QString displayPath = QDir::toNativeSeparators(path);
-    auto* action = m_workspaceMenu->addAction(QString(displayPath).replace('&', "&&"));
-    action->setToolTip(displayPath);
-    action->setData(path);
-    action->setCheckable(true);
-    action->setChecked(workspace == WorkspaceManager::instance()->current());
-    m_workspaceActions->addAction(action);
-    connect(action, &QAction::triggered, this, [path] {
-        auto* manager = WorkspaceManager::instance();
-        manager->activate(manager->find(path));
-    });
-    m_workspaceMenu->setEnabled(true);
+    const QSignalBlocker blocker(m_workspaceCombo);
+    m_workspaceCombo->addItem(displayPath, path);
+    m_workspaceCombo->setItemData(m_workspaceCombo->count() - 1, displayPath, Qt::ToolTipRole);
+    updateWorkspaceSelection();
 }
 
-void PeViewer::removeWorkspaceAction(Workspace* workspace) {
-    for (auto* action : m_workspaceActions->actions()) {
-        if (action->data().toString() == workspace->path()) {
-            m_workspaceActions->removeAction(action);
-            m_workspaceMenu->removeAction(action);
-            action->deleteLater();
-            break;
-        }
-    }
-    m_workspaceMenu->setEnabled(!WorkspaceManager::instance()->empty());
+void PeViewer::removeWorkspace(Workspace* workspace) {
+    const QSignalBlocker blocker(m_workspaceCombo);
+    m_workspaceCombo->removeItem(m_workspaceCombo->findData(workspace->path()));
+    updateWorkspaceSelection();
+}
+
+void PeViewer::updateWorkspaceSelection() {
+    const QSignalBlocker blocker(m_workspaceCombo);
+    auto* current = WorkspaceManager::instance()->current();
+    const int index = current ? m_workspaceCombo->findData(current->path()) : -1;
+    m_workspaceCombo->completer()->popup()->hide();
+    m_workspaceCombo->setCurrentIndex(index);
+    // setCurrentIndex does not restore edited text when the index is unchanged.
+    m_workspaceCombo->setEditText(index >= 0 ? m_workspaceCombo->itemText(index) : QString());
+    m_workspaceCombo->setToolTip(current ? QDir::toNativeSeparators(current->path())
+                                        : tr("Search workspaces..."));
+    m_workspaceCombo->setEnabled(m_workspaceCombo->count() > 0);
 }
 
 void PeViewer::updateCurrentWorkspace(Workspace* workspace) {
     ui.actionClose->setEnabled(workspace != nullptr);
-    for (auto* action : m_workspaceActions->actions()) {
-        action->setChecked(workspace && action->data().toString() == workspace->path());
-    }
+    updateWorkspaceSelection();
     ui.dependencyTree->setGraph(workspace ? &workspace->graph() : nullptr);
     updateWorkspaceStatus();
 }

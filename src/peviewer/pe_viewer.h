@@ -4,9 +4,8 @@
 
 #include "ui_pe_viewer.h"
 
-class QActionGroup;
 class LanguageManager;
-class QMenu;
+class QComboBox;
 class SARibbonCategory;
 class SARibbonPanel;
 class Workspace;
@@ -20,6 +19,7 @@ public:
 
 protected:
     void changeEvent(QEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private Q_SLOTS:
     void on_actionOpen_triggered(bool b);
@@ -28,18 +28,17 @@ private Q_SLOTS:
 private:
     void setupRibbon();
     void updateLanguageActions();
-    void addWorkspaceAction(Workspace* workspace);
-    void removeWorkspaceAction(Workspace* workspace);
+    void addWorkspace(Workspace* workspace);
+    void removeWorkspace(Workspace* workspace);
+    void updateWorkspaceSelection();
     void updateCurrentWorkspace(Workspace* workspace);
     void updateWorkspaceStatus();
     void retranslateUi();
 
     LanguageManager& m_languageManager;
-    QActionGroup* m_workspaceActions = nullptr;
-    QMenu* m_workspaceMenu = nullptr;
+    QComboBox* m_workspaceCombo = nullptr;
     SARibbonCategory* m_homeCategory = nullptr;
     SARibbonPanel* m_filePanel = nullptr;
-    SARibbonPanel* m_workspacePanel = nullptr;
     SARibbonPanel* m_languagePanel = nullptr;
     Ui::PeViewerClass ui;
 };
