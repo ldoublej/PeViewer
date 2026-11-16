@@ -336,6 +336,10 @@ void testEditorViews() {
     auto* home = window.findChild<SARibbonCategory*>(QStringLiteral("ribbonHome"));
     auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
     require(ribbon && stack && homePage && home && closeAction, "Editor host widgets are missing");
+    require(window.contentsMargins() == QMargins(0, 0, 0, 0),
+            "Window default margins leave a border around the Ribbon");
+    require(ribbon->x() == 0 && ribbon->width() == window.width(),
+            "Ribbon does not span the full window width");
     require(stack->currentWidget() == homePage, "Home page is not shown without documents");
     require(ribbon->categoryPages().size() == 1, "Unexpected Ribbon tabs without documents");
 

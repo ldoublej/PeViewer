@@ -33,6 +33,9 @@
 
 PeViewer::PeViewer(LanguageManager& languageManager, QWidget* parent)
     : SARibbonMainWindow(parent), m_languageManager(languageManager) {
+    // SARibbonMainWindow adds a 2px left/right margin by default; drop it so the
+    // Ribbon and the central pages are flush with the window border.
+    setContentsMargins(0, 0, 0, 0);
     ui.setupUi(this);
     setupRibbon();
     m_editorHost = new EditorHost(ribbonBar(), ui.viewStack, ui.homePage, this);
@@ -77,6 +80,7 @@ void PeViewer::setupRibbon() {
     auto* ribbon = ribbonBar();
     ribbon->setObjectName(QStringLiteral("ribbonBar"));
     ribbon->setRibbonStyle(SARibbonBar::RibbonStyleLooseTwoRow);
+    QTimer::singleShot(0, this, [ this ] () { this->setRibbonTheme(SARibbonTheme::RibbonThemeOffice2016Blue); });
     setupFileMenu();
 
     m_homeCategory = ribbon->addCategoryPage(tr("Home"));
