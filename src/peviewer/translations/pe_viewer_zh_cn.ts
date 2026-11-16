@@ -72,20 +72,22 @@
 <context>
     <name>PeViewer</name>
     <message>
-        <location filename="../pe_viewer.cpp" line="+178"/>
+        <location filename="../pe_viewer.cpp" line="+200"/>
         <location line="+30"/>
         <source>Search workspaces...</source>
         <translation>搜索工作区...</translation>
     </message>
     <message>
-        <location line="-137"/>
-        <location line="+104"/>
+        <location line="-156"/>
+        <location line="+122"/>
         <source>Home</source>
         <translation>主页</translation>
     </message>
     <message>
-        <location line="-102"/>
-        <location line="+103"/>
+        <location line="-71"/>
+        <location line="+5"/>
+        <location line="+67"/>
+        <location line="+1"/>
         <source>File</source>
         <translation>文件</translation>
     </message>
@@ -95,8 +97,8 @@
         <translation>工作区</translation>
     </message>
     <message>
-        <location line="-66"/>
-        <location line="+68"/>
+        <location line="-91"/>
+        <location line="+93"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -106,7 +108,7 @@
         <translation>就绪</translation>
     </message>
     <message>
-        <location line="-107"/>
+        <location line="-108"/>
         <source>Open PE File</source>
         <translation>打开 PE 文件</translation>
     </message>
@@ -123,7 +125,7 @@
 %2</translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+94"/>
         <source>Loaded %1: %2 modules</source>
         <translation>已加载 %1：%2 个模块</translation>
     </message>
@@ -141,7 +143,7 @@
         <translation>打开</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+8"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>

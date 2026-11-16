@@ -6,7 +6,9 @@
 
 class LanguageManager;
 class QComboBox;
+class SARibbonApplicationButton;
 class SARibbonCategory;
+class SARibbonMenu;
 class SARibbonPanel;
 class Workspace;
 
@@ -27,6 +29,8 @@ private Q_SLOTS:
 
 private:
     void setupRibbon();
+    void setupFileMenu();
+    void updateFileButtonWidth();
     void updateLanguageActions();
     void addWorkspace(Workspace* workspace);
     void removeWorkspace(Workspace* workspace);
@@ -37,8 +41,9 @@ private:
 
     LanguageManager& m_languageManager;
     QComboBox* m_workspaceCombo = nullptr;
+    SARibbonApplicationButton* m_applicationButton = nullptr;
+    SARibbonMenu* m_fileMenu = nullptr;
     SARibbonCategory* m_homeCategory = nullptr;
-    SARibbonPanel* m_filePanel = nullptr;
     SARibbonPanel* m_languagePanel = nullptr;
     Ui::PeViewerClass ui;
 };

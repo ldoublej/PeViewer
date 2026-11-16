@@ -5,6 +5,7 @@
 #include <QCompleter>
 #include <QDir>
 #include <QFile>
+#include <QFontMetrics>
 #include <QLocale>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -13,8 +14,11 @@
 #include <QStatusBar>
 #include <QTemporaryDir>
 #include <QTreeView>
+#include <QToolButton>
+#include <SARibbonApplicationButton.h>
 #include <SARibbonBar.h>
 #include <SARibbonCategory.h>
+#include <SARibbonMenu.h>
 #include <SARibbonPanel.h>
 #include <SARibbonQuickAccessBar.h>
 #include <iostream>
@@ -40,14 +44,26 @@ void testLanguageSwitching() {
         require(languages.language() == QStringLiteral("en"), "English preference not loaded");
         PeViewer window(languages);
         auto* languagePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonLanguage"));
-        auto* filePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonFile"));
+        auto* applicationButton =
+            window.findChild<SARibbonApplicationButton*>(QStringLiteral("ribbonApplicationButton"));
+        auto* fileMenu = window.findChild<SARibbonMenu*>(QStringLiteral("ribbonFileMenu"));
+        auto* openAction = window.findChild<QAction*>(QStringLiteral("actionOpen"));
+        auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
         auto* home = window.findChild<SARibbonCategory*>(QStringLiteral("ribbonHome"));
         auto* workspaceCombo = window.findChild<QComboBox*>(QStringLiteral("workspaceCombo"));
         auto* english = window.findChild<QAction*>(QStringLiteral("actionEnglish"));
         auto* chinese = window.findChild<QAction*>(QStringLiteral("actionSimplifiedChinese"));
-        require(languagePanel && filePanel && home && workspaceCombo && english &&
-                    chinese && window.menuWidget() == window.ribbonBar(),
+        require(languagePanel && applicationButton && fileMenu && openAction && closeAction &&
+                    home && workspaceCombo && english && chinese &&
+                    window.menuWidget() == window.ribbonBar(),
                 "Ribbon is incomplete or not installed as the menu widget");
+        require(applicationButton->menu() == fileMenu && fileMenu->actions().contains(openAction) &&
+                    fileMenu->actions().contains(closeAction) &&
+                    !window.findChild<SARibbonPanel*>(QStringLiteral("ribbonFile")),
+                "File actions are not in the application button menu");
+        require(applicationButton->text() == QStringLiteral("File") &&
+                    applicationButton->popupMode() == QToolButton::InstantPopup,
+                "English file menu is incorrect");
         const auto menuBars = window.findChildren<QMenuBar*>();
         require(menuBars.size() == 1 && menuBars.first() == window.ribbonBar() &&
                     QFile::exists(QStringLiteral(":/SARibbonTheme/resource/theme-base.qss")),
@@ -56,7 +72,7 @@ void testLanguageSwitching() {
                     languagePanel->actionToRibbonToolButton(chinese),
                 "Language actions are missing from the Ribbon");
         require(home->categoryName() == QStringLiteral("Home") &&
-                    filePanel->panelName() == QStringLiteral("File") &&
+                    applicationButton->text() == QStringLiteral("File") &&
                     languagePanel->panelName() == QStringLiteral("Language"),
                 "English Ribbon labels are incorrect");
         require(workspaceCombo->accessibleName() == QStringLiteral("Workspace") &&
@@ -71,7 +87,9 @@ void testLanguageSwitching() {
         require(languages.language() == QStringLiteral("zh_CN"),
                 "Chinese action did not switch language");
         require(home->categoryName() == QStringLiteral("主页") &&
-                    filePanel->panelName() == QStringLiteral("文件") &&
+                    applicationButton->text() == QStringLiteral("文件") &&
+                    openAction->text() == QStringLiteral("打开") &&
+                    closeAction->text() == QStringLiteral("关闭") &&
                     languagePanel->panelName() == QStringLiteral("语言"),
                 "Ribbon labels were not retranslated");
         require(workspaceCombo->accessibleName() == QStringLiteral("工作区") &&
@@ -163,10 +181,14 @@ void testWorkspaceSelector() {
     auto* combo = window.findChild<QComboBox*>(QStringLiteral("workspaceCombo"));
     auto* tree = window.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
     auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
-    auto* filePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonFile"));
-    require(combo && tree && closeAction && filePanel, "Workspace selector or dependency tree is missing");
-    auto* closeButton = filePanel->actionToRibbonToolButton(closeAction);
-    require(closeButton && combo->parentWidget() == window.ribbonBar()->quickAccessBar(),
+    auto* fileMenu = window.findChild<SARibbonMenu*>(QStringLiteral("ribbonFileMenu"));
+    auto* fileButton = window.findChild<SARibbonApplicationButton*>(QStringLiteral("ribbonApplicationButton"));
+    require(combo && tree && closeAction && fileMenu && fileButton &&
+                fileMenu->actions().contains(closeAction),
+            "Workspace selector, dependency tree or file menu is missing");
+    require(fileButton->width() - fileButton->fontMetrics().horizontalAdvance(fileButton->text()) <= 40,
+            "File button is much wider than its text");
+    require(combo->parentWidget() == window.ribbonBar()->quickAccessBar(),
             "Workspace selector is not in the title bar");
     const QPoint comboTop = combo->mapTo(window.ribbonBar(), QPoint());
     require(comboTop.y() >= 0 && comboTop.y() + combo->height() <= window.ribbonBar()->titleBarHeight(),
@@ -255,7 +277,7 @@ void testWorkspaceSelector() {
                 combo->currentData().toString() == secondPath &&
                 window.statusBar()->currentMessage() == QStringLiteral("已加载 app.exe：1 个模块"),
             "Language switching lost the active workspace or its translated status");
-    closeButton->click();
+    closeAction->trigger();
     require(manager->current() == first && combo->count() == 1 &&
                 combo->currentData().toString() == firstPath && closeAction->isEnabled() &&
                 tree->model()->index(0, 2).data().toString() == firstIdentity,

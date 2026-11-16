@@ -8,15 +8,19 @@
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QSignalBlocker>
 #include <QStyle>
 #include <QTimer>
+#include <QToolButton>
 
+#include <SARibbonApplicationButton.h>
 #include <SARibbonBar.h>
 #include <SARibbonCategory.h>
+#include <SARibbonMenu.h>
 #include <SARibbonPanel.h>
 #include <SARibbonQuickAccessBar.h>
 
@@ -66,16 +70,10 @@ void PeViewer::setupRibbon() {
     auto* ribbon = ribbonBar();
     ribbon->setObjectName(QStringLiteral("ribbonBar"));
     ribbon->setRibbonStyle(SARibbonBar::RibbonStyleLooseTwoRow);
-    ribbon->setApplicationButton(nullptr);
+    setupFileMenu();
 
     m_homeCategory = ribbon->addCategoryPage(tr("Home"));
     m_homeCategory->setObjectName(QStringLiteral("ribbonHome"));
-    m_filePanel = m_homeCategory->addPanel(tr("File"));
-    m_filePanel->setObjectName(QStringLiteral("ribbonFile"));
-    ui.actionOpen->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
-    ui.actionClose->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
-    m_filePanel->addLargeAction(ui.actionOpen);
-    m_filePanel->addLargeAction(ui.actionClose);
 
     m_workspaceCombo = new QComboBox(ribbon);
     m_workspaceCombo->setObjectName(QStringLiteral("workspaceCombo"));
@@ -112,6 +110,38 @@ void PeViewer::setupRibbon() {
     m_languagePanel->setObjectName(QStringLiteral("ribbonLanguage"));
     m_languagePanel->addSmallAction(ui.actionEnglish);
     m_languagePanel->addSmallAction(ui.actionSimplifiedChinese);
+}
+
+void PeViewer::setupFileMenu() {
+    // SARibbonBar already created a default application button; reuse it so the
+    // Ribbon stylesheet keeps applying, and only create one if it was removed.
+    auto* ribbon = ribbonBar();
+    m_applicationButton = qobject_cast<SARibbonApplicationButton*>(ribbon->applicationButton());
+    if (!m_applicationButton) {
+        m_applicationButton = new SARibbonApplicationButton(this);
+        ribbon->setApplicationButton(m_applicationButton);
+    }
+    m_applicationButton->setObjectName(QStringLiteral("ribbonApplicationButton"));
+    m_applicationButton->setPopupMode(QToolButton::InstantPopup);
+    m_applicationButton->setText(tr("File"));
+
+    ui.actionOpen->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+    ui.actionClose->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
+
+    m_fileMenu = new SARibbonMenu(tr("File"), ribbon);
+    m_fileMenu->setObjectName(QStringLiteral("ribbonFileMenu"));
+    m_fileMenu->addAction(ui.actionOpen);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(ui.actionClose);
+    m_applicationButton->setMenu(m_fileMenu);
+}
+
+void PeViewer::updateFileButtonWidth() {
+    // SARibbon derives the application button width from its size hint, whose height the
+    // Ribbon stylesheet collapses to a few pixels, which inflates the button. Pin the
+    // width to the text plus padding so the File button stays as narrow as its label.
+    const QFontMetrics metrics = m_applicationButton->fontMetrics();
+    m_applicationButton->setFixedWidth(metrics.horizontalAdvance(m_applicationButton->text()) + 32);
 }
 
 void PeViewer::on_actionOpen_triggered(bool b) {
@@ -173,7 +203,9 @@ bool PeViewer::eventFilter(QObject* watched, QEvent* event) {
 void PeViewer::retranslateUi() {
     ui.retranslateUi(this);
     m_homeCategory->setCategoryName(tr("Home"));
-    m_filePanel->setPanelName(tr("File"));
+    m_applicationButton->setText(tr("File"));
+    m_fileMenu->setTitle(tr("File"));
+    updateFileButtonWidth();
     m_workspaceCombo->setAccessibleName(tr("Workspace"));
     m_workspaceCombo->lineEdit()->setPlaceholderText(tr("Search workspaces..."));
     m_languagePanel->setPanelName(tr("Language"));
