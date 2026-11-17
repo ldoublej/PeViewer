@@ -80,7 +80,7 @@ void PeViewer::setupRibbon() {
     auto* ribbon = ribbonBar();
     ribbon->setObjectName(QStringLiteral("ribbonBar"));
     ribbon->setRibbonStyle(SARibbonBar::RibbonStyleLooseTwoRow);
-    QTimer::singleShot(0, this, [ this ] () { this->setRibbonTheme(SARibbonTheme::RibbonThemeOffice2016Blue); });
+    //QTimer::singleShot(0, this, [ this ] () { this->setRibbonTheme(SARibbonTheme::RibbonThemeOffice2016Blue); });
     setupFileMenu();
 
     m_homeCategory = ribbon->addCategoryPage(tr("Home"));
