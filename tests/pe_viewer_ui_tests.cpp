@@ -14,6 +14,7 @@
 #include <QSettings>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTreeView>
 #include <QToolButton>
@@ -165,9 +166,20 @@ void searchDocuments(QComboBox* combo, const QString& query) {
     pressKey(combo->lineEdit(), 0, query);
 }
 
-bool displayShowsIdentity(QStackedWidget* stack, const QString& identity) {
-    QWidget* page = stack ? stack->currentWidget() : nullptr;
-    auto* tree = page ? page->findChild<QTreeView*>(QStringLiteral("dependencyTreeView")) : nullptr;
+bool displayShowsIdentity(PeViewer& window, const QString& identity) {
+    // The headers view is first, so switch to the dependency view to compare the
+    // displayed module's identity before checking the visible page.
+    auto* ribbon = window.ribbonBar();
+    auto* page = window.findChild<SARibbonCategory*>(QStringLiteral("editorView/dependency-tree"));
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+    if (!ribbon || !page || !stack) {
+        return false;
+    }
+    ribbon->setCurrentIndex(ribbon->categoryIndex(page));
+    QApplication::processEvents();
+    QWidget* current = stack->currentWidget();
+    auto* tree =
+        current ? current->findChild<QTreeView*>(QStringLiteral("dependencyTreeView")) : nullptr;
     return tree && tree->model() && tree->model()->index(0, 2).data().toString() == identity;
 }
 
@@ -219,7 +231,7 @@ void testDocumentSelector() {
             "Document path is missing or its ampersand was changed");
     selectDocument(combo, 0);
     require(manager->current() == first && combo->currentData().toString() == firstPath &&
-                closeAction->isEnabled() && displayShowsIdentity(stack, firstIdentity),
+                closeAction->isEnabled() && displayShowsIdentity(window, firstIdentity),
             "Selecting a document did not activate and display it");
     require(window.statusBar()->currentMessage() == QStringLiteral("Loaded app.exe: 1 modules"),
             "Document activation did not update the status");
@@ -227,7 +239,7 @@ void testDocumentSelector() {
     Document* second = manager->open(secondPath);
     require(combo->count() == 2 && combo->currentData().toString() == secondPath &&
                 combo->itemText(0) != combo->itemText(1) &&
-                displayShowsIdentity(stack, secondIdentity),
+                displayShowsIdentity(window, secondIdentity),
             "Documents with the same filename cannot be distinguished");
     searchDocuments(combo, QStringLiteral("LEFT&PART"));
     auto* completer = combo->completer();
@@ -237,7 +249,7 @@ void testDocumentSelector() {
     pressKey(completer->popup(), Qt::Key_Return);
     require(manager->current() == first && combo->currentData().toString() == firstPath &&
                 combo->currentText() == QDir::toNativeSeparators(firstPath) &&
-                displayShowsIdentity(stack, firstIdentity),
+                displayShowsIdentity(window, firstIdentity),
             "Selecting a filtered result did not activate the correct document");
     searchDocuments(combo, QStringLiteral("RIGHT"));
     require(completer->completionCount() == 1, "Second document did not match the query");
@@ -294,7 +306,7 @@ void testDocumentSelector() {
     closeAction->trigger();
     require(manager->current() == first && combo->count() == 1 &&
                 combo->currentData().toString() == firstPath && closeAction->isEnabled() &&
-                displayShowsIdentity(stack, firstIdentity),
+                displayShowsIdentity(window, firstIdentity),
             "Closing the current document did not select and display the fallback");
     second = manager->open(secondPath, DocumentManager::OpenMode::OpenOnly);
     require(combo->count() == 2 && combo->currentData().toString() == firstPath,
@@ -353,31 +365,73 @@ void testEditorViews() {
     auto* manager = DocumentManager::instance();
     Document* document = manager->open(path);
     QApplication::processEvents();
-    auto* viewPage = window.findChild<SARibbonCategory*>(QStringLiteral("editorView/dependency-tree"));
-    require(document && document->editor() && viewPage && document->editor()->views().size() == 1,
-            "Opening a document did not create its editor view");
-    require(ribbon->categoryPages().size() == 2, "View tab was not added next to Home");
-    require(ribbon->categoryByIndex(ribbon->currentIndex()) == viewPage, "View tab is not selected");
-    require(viewPage->categoryName() == QStringLiteral("Dependency"),
-            "View tab title is not translated");
+    auto* headersPage = window.findChild<SARibbonCategory*>(QStringLiteral("editorView/headers"));
+    auto* dependencyPage =
+        window.findChild<SARibbonCategory*>(QStringLiteral("editorView/dependency-tree"));
+    require(document && document->editor() && headersPage && dependencyPage &&
+                document->editor()->views().size() == 2,
+            "Opening a document did not create both editor views");
+    require(ribbon->categoryPages().size() == 3, "View tabs were not added next to Home");
+    require(ribbon->categoryByIndex(ribbon->currentIndex()) == headersPage,
+            "The headers view is not the first selected tab");
+    require(headersPage->categoryName() == QStringLiteral("Headers") &&
+                dependencyPage->categoryName() == QStringLiteral("Dependency"),
+            "View tab titles are not translated");
     require(stack->currentWidget() != homePage, "View page is not displayed");
-    require(stack->count() == 2, "View page was not added to the stack");
+    require(stack->count() == 3, "View pages were not added to the stack");
     require(closeAction->isEnabled(), "Close action is disabled with an open document");
+
+    auto* headersPanel = window.findChild<SARibbonPanel*>(QStringLiteral("headersPanel"));
+    require(headersPanel && headersPanel->panelName() == QStringLiteral("View"),
+            "Headers Ribbon panel is missing or not translated");
+    auto* dosTable = window.findChild<QTableWidget*>(QStringLiteral("dosHeaderTable"));
+    auto* fileTable = window.findChild<QTableWidget*>(QStringLiteral("fileHeaderTable"));
+    auto* optionalTable = window.findChild<QTableWidget*>(QStringLiteral("optionalHeaderTable"));
+    require(dosTable && fileTable && optionalTable, "PE header tables are missing");
+    require(dosTable->rowCount() == 19 && fileTable->rowCount() == 7 &&
+                optionalTable->rowCount() == 30,
+            "PE header tables have unexpected row counts");
+    require(dosTable->item(18, 1)->text() == QStringLiteral("e_lfanew") &&
+                dosTable->item(18, 2)->text() == QStringLiteral("0x00000080"),
+            "DOS header values were not loaded");
+    require(fileTable->item(0, 1)->text() == QStringLiteral("Machine") &&
+                fileTable->item(0, 2)->text() == QStringLiteral("0x014C"),
+            "File header values were not loaded");
+    require(optionalTable->item(0, 1)->text() == QStringLiteral("Magic") &&
+                optionalTable->item(0, 2)->text() == QStringLiteral("0x010B"),
+            "Optional header values were not loaded");
 
     // Home switches the central page; the view tab restores it.
     ribbon->setCurrentIndex(ribbon->categoryIndex(home));
     QApplication::processEvents();
     require(stack->currentWidget() == homePage, "Home tab did not show the home page");
-    ribbon->setCurrentIndex(ribbon->categoryIndex(viewPage));
+    ribbon->setCurrentIndex(ribbon->categoryIndex(headersPage));
     QApplication::processEvents();
     require(stack->currentWidget() != homePage, "View tab did not restore the view page");
+    require(stack->currentWidget()->findChild<QTableWidget*>(QStringLiteral("dosHeaderTable")),
+            "The headers view did not restore its page");
 
     require(languages.setLanguage(QStringLiteral("zh_CN")), "Could not switch to Chinese");
     QApplication::processEvents();
-    require(viewPage->categoryName() == QStringLiteral("依赖"), "View tab was not retranslated");
+    require(headersPage->categoryName() == QStringLiteral("头信息") &&
+                dependencyPage->categoryName() == QStringLiteral("依赖"),
+            "View tabs were not retranslated");
+    auto* dosSection = window.findChild<QWidget*>(QStringLiteral("dosHeaderSection"));
+    auto* dosTitle = dosSection ? dosSection->findChild<QLabel*>(QStringLiteral("headerTableTitle"))
+                                : nullptr;
+    require(dosTitle && dosTitle->text() == QStringLiteral("DOS 头") &&
+                dosTable->horizontalHeaderItem(1)->text() == QStringLiteral("字段") &&
+                headersPanel->panelName() == QStringLiteral("视图"),
+            "PE header tables or Ribbon panel were not retranslated");
     require(languages.setLanguage(QStringLiteral("en")), "Could not switch to English");
     QApplication::processEvents();
-    require(viewPage->categoryName() == QStringLiteral("Dependency"), "View tab title was not restored");
+    require(headersPage->categoryName() == QStringLiteral("Headers") &&
+                dependencyPage->categoryName() == QStringLiteral("Dependency"),
+            "View tab titles were not restored");
+    require(dosTitle->text() == QStringLiteral("DOS Header") &&
+                dosTable->horizontalHeaderItem(1)->text() == QStringLiteral("Field") &&
+                headersPanel->panelName() == QStringLiteral("View"),
+            "PE header titles were not restored");
 
     closeAction->trigger();
     QApplication::processEvents();

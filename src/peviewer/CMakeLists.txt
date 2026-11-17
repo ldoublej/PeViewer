@@ -17,6 +17,12 @@ set(PROJECT_SOURCES
     editors/pe_editor.cpp
     editors/dependency_tree_editor_view.h
     editors/dependency_tree_editor_view.cpp
+    editors/headers_editor_view.h
+    editors/headers_editor_view.cpp
+    components/header_table_widget.h
+    components/header_table_widget.cpp
+    components/pe_headers_widget.h
+    components/pe_headers_widget.cpp
     components/dependency_tree_widget.h
     components/dependency_tree_widget.cpp
     components/dependency_tree_view.h
