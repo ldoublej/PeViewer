@@ -1,10 +1,10 @@
-project(workspace LANGUAGES CXX)
+project(document LANGUAGES CXX)
 
 add_library(${PROJECT_NAME} STATIC
-    workspace.cpp
-    workspace.h
-    workspace_manager.cpp
-    workspace_manager.h
+    document.cpp
+    document.h
+    document_manager.cpp
+    document_manager.h
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -13,6 +13,7 @@ target_link_libraries(${PROJECT_NAME}
         parse
         datasource
         dependencies
+        editor
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

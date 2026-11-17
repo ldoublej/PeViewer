@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>751</width>
-    <height>491</height>
+    <width>960</width>
+    <height>640</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -31,50 +31,150 @@
      <number>0</number>
     </property>
     <item>
-     <widget class="DependencyTreeWidget" name="dependencyTree"/>
+     <widget class="QLabel" name="ribbonBorder">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>1</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>1</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: #bec0c2;</string>
+      </property>
+      <property name="text">
+       <string notr="true"/>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QStackedWidget" name="viewStack">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="homePage">
+       <layout class="QVBoxLayout" name="homeLayout">
+        <property name="spacing">
+         <number>12</number>
+        </property>
+        <property name="leftMargin">
+         <number>24</number>
+        </property>
+        <property name="topMargin">
+         <number>24</number>
+        </property>
+        <property name="rightMargin">
+         <number>24</number>
+        </property>
+        <property name="bottomMargin">
+         <number>24</number>
+        </property>
+        <item>
+         <spacer name="homeTopSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>80</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="homeTitle">
+          <property name="font">
+           <font>
+            <pointsize>18</pointsize>
+            <weight>75</weight>
+            <bold>true</bold>
+           </font>
+          </property>
+          <property name="text">
+           <string>PeViewer</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="homeHint">
+          <property name="text">
+           <string>Open a PE file to start</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="homeButtonLayout">
+          <item>
+           <spacer name="homeButtonLeftSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="homeOpenButton">
+            <property name="minimumSize">
+             <size>
+              <width>140</width>
+              <height>32</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>Open File...</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="homeButtonRightSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <spacer name="homeBottomSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>100</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
     </item>
    </layout>
-  </widget>
-  <widget class="QMenuBar" name="menuBar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>751</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <widget class="QMenu" name="menuLanguage">
-    <property name="title">
-     <string>&amp;Language</string>
-    </property>
-    <addaction name="actionEnglish"/>
-    <addaction name="actionSimplifiedChinese"/>
-   </widget>
-   <widget class="QMenu" name="menuFile">
-    <property name="title">
-     <string>&amp;File</string>
-    </property>
-    <addaction name="actionOpen"/>
-    <addaction name="separator"/>
-    <addaction name="actionClose"/>
-   </widget>
-   <widget class="QMenu" name="menuWorkspace">
-    <property name="title">
-     <string>&amp;Workspace</string>
-    </property>
-   </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuWorkspace"/>
-   <addaction name="menuLanguage"/>
-  </widget>
-  <widget class="QToolBar" name="mainToolBar">
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionEnglish">
@@ -97,21 +197,20 @@
    <property name="text">
     <string>Open</string>
    </property>
+   <property name="shortcut">
+    <string notr="true">Ctrl+O</string>
+   </property>
   </action>
   <action name="actionClose">
    <property name="text">
     <string>Close</string>
    </property>
+   <property name="shortcut">
+    <string notr="true">Ctrl+W</string>
+   </property>
   </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
- <customwidgets>
-  <customwidget>
-   <class>DependencyTreeWidget</class>
-   <extends>QWidget</extends>
-   <header>components/dependency_tree_widget.h</header>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections/>
 </ui>

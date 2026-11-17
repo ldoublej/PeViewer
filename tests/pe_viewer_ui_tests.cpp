@@ -1,21 +1,40 @@
 #include <QAction>
 #include <QApplication>
+#include <QAbstractItemView>
+#include <QComboBox>
+#include <QCompleter>
 #include <QDir>
+#include <QFile>
+#include <QFontMetrics>
 #include <QLocale>
-#include <QMenu>
+#include <QKeyEvent>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMenuBar>
 #include <QSettings>
+#include <QStackedWidget>
 #include <QStatusBar>
+#include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTreeView>
+#include <QToolButton>
+#include <QWidget>
+#include <editor.h>
+#include <SARibbonApplicationButton.h>
+#include <SARibbonBar.h>
+#include <SARibbonCategory.h>
+#include <SARibbonMenu.h>
+#include <SARibbonPanel.h>
+#include <SARibbonQuickAccessBar.h>
 #include <iostream>
 #include <stdexcept>
 
 #include "dependencies_test_support.h"
+#include "document.h"
+#include "document_manager.h"
+#include "editor_registration.h"
 #include "language_manager.h"
 #include "pe_viewer.h"
-#include "workspace.h"
-#include "workspace_manager.h"
 
 namespace {
 void require(bool condition, const char* message) {
@@ -30,14 +49,41 @@ void testLanguageSwitching() {
         LanguageManager languages;
         require(languages.language() == QStringLiteral("en"), "English preference not loaded");
         PeViewer window(languages);
-        auto* menu = window.findChild<QMenu*>(QStringLiteral("menuLanguage"));
-        auto* workspaceMenu = window.findChild<QMenu*>(QStringLiteral("menuWorkspace"));
+        auto* languagePanel = window.findChild<SARibbonPanel*>(QStringLiteral("ribbonLanguage"));
+        auto* applicationButton =
+            window.findChild<SARibbonApplicationButton*>(QStringLiteral("ribbonApplicationButton"));
+        auto* fileMenu = window.findChild<SARibbonMenu*>(QStringLiteral("ribbonFileMenu"));
+        auto* openAction = window.findChild<QAction*>(QStringLiteral("actionOpen"));
+        auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
+        auto* home = window.findChild<SARibbonCategory*>(QStringLiteral("ribbonHome"));
+        auto* documentCombo = window.findChild<QComboBox*>(QStringLiteral("documentCombo"));
         auto* english = window.findChild<QAction*>(QStringLiteral("actionEnglish"));
         auto* chinese = window.findChild<QAction*>(QStringLiteral("actionSimplifiedChinese"));
-        require(menu && workspaceMenu && english && chinese, "Language menu is incomplete");
-        require(menu->title() == QStringLiteral("&Language"), "English menu is incorrect");
-        require(workspaceMenu->title() == QStringLiteral("&Workspace"),
-                "English workspace menu is incorrect");
+        require(languagePanel && applicationButton && fileMenu && openAction && closeAction &&
+                    home && documentCombo && english && chinese &&
+                    window.menuWidget() == window.ribbonBar(),
+                "Ribbon is incomplete or not installed as the menu widget");
+        require(applicationButton->menu() == fileMenu && fileMenu->actions().contains(openAction) &&
+                    fileMenu->actions().contains(closeAction) &&
+                    !window.findChild<SARibbonPanel*>(QStringLiteral("ribbonFile")),
+                "File actions are not in the application button menu");
+        require(applicationButton->text() == QStringLiteral("File") &&
+                    applicationButton->popupMode() == QToolButton::InstantPopup,
+                "English file menu is incorrect");
+        const auto menuBars = window.findChildren<QMenuBar*>();
+        require(menuBars.size() == 1 && menuBars.first() == window.ribbonBar() &&
+                    QFile::exists(QStringLiteral(":/SARibbonTheme/resource/theme-base.qss")),
+                "Traditional menu bar remains or static Ribbon resources are missing");
+        require(languagePanel->actionToRibbonToolButton(english) &&
+                    languagePanel->actionToRibbonToolButton(chinese),
+                "Language actions are missing from the Ribbon");
+        require(home->categoryName() == QStringLiteral("Home") &&
+                    applicationButton->text() == QStringLiteral("File") &&
+                    languagePanel->panelName() == QStringLiteral("Language"),
+                "English Ribbon labels are incorrect");
+        require(documentCombo->accessibleName() == QStringLiteral("Document") &&
+                    documentCombo->lineEdit()->placeholderText() == QStringLiteral("Search documents..."),
+                "English document selector is incorrect");
         require(window.statusBar()->currentMessage() == QStringLiteral("Ready"),
                 "English status is incorrect");
         require(english->isChecked() && !chinese->isChecked(), "English selection is incorrect");
@@ -46,16 +92,23 @@ void testLanguageSwitching() {
         QApplication::processEvents();
         require(languages.language() == QStringLiteral("zh_CN"),
                 "Chinese action did not switch language");
-        require(menu->title() == QStringLiteral("语言(&L)"), "Designer UI was not retranslated");
-        require(workspaceMenu->title() == QStringLiteral("工作区(&W)"),
-                "Workspace menu was not retranslated");
+        require(home->categoryName() == QStringLiteral("主页") &&
+                    applicationButton->text() == QStringLiteral("文件") &&
+                    openAction->text() == QStringLiteral("打开") &&
+                    closeAction->text() == QStringLiteral("关闭") &&
+                    languagePanel->panelName() == QStringLiteral("语言"),
+                "Ribbon labels were not retranslated");
+        require(documentCombo->accessibleName() == QStringLiteral("文档") &&
+                    documentCombo->lineEdit()->placeholderText() == QStringLiteral("搜索文档..."),
+                "Document selector was not retranslated");
         require(window.statusBar()->currentMessage() == QStringLiteral("就绪"),
                 "C++ text was not retranslated");
         require(chinese->isChecked() && !english->isChecked(), "Chinese selection is incorrect");
 
         english->trigger();
         QApplication::processEvents();
-        require(menu->title() == QStringLiteral("&Language"), "Switching back to English failed");
+        require(languagePanel->panelName() == QStringLiteral("Language"),
+                "Switching back to English failed");
         require(window.statusBar()->currentMessage() == QStringLiteral("Ready"),
                 "English status was not restored");
 
@@ -65,7 +118,7 @@ void testLanguageSwitching() {
                 "Unsupported language accepted");
         require(languages.language() == QStringLiteral("zh_CN"),
                 "Invalid language changed selection");
-        require(menu->title() == QStringLiteral("语言(&L)"),
+        require(languagePanel->panelName() == QStringLiteral("语言"),
                 "Invalid language replaced translation");
         require(
             QSettings().value(QStringLiteral("ui/language")).toString() == QStringLiteral("zh_CN"),
@@ -92,7 +145,45 @@ void testLanguageSwitching() {
     QSettings().remove(QStringLiteral("ui/language"));
 }
 
-void testWorkspaceMenu() {
+void pressKey(QWidget* widget, int key, const QString& text = QString()) {
+    QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier, text);
+    QApplication::sendEvent(widget, &press);
+    QKeyEvent release(QEvent::KeyRelease, key, Qt::NoModifier, text);
+    QApplication::sendEvent(widget, &release);
+    QApplication::processEvents();
+}
+
+void selectDocument(QComboBox* combo, int row) {
+    combo->showPopup();
+    combo->view()->setCurrentIndex(combo->model()->index(row, 0));
+    pressKey(combo->view(), Qt::Key_Return);
+}
+
+void searchDocuments(QComboBox* combo, const QString& query) {
+    combo->setFocus();
+    QApplication::processEvents();
+    combo->lineEdit()->selectAll();
+    pressKey(combo->lineEdit(), 0, query);
+}
+
+bool displayShowsIdentity(PeViewer& window, const QString& identity) {
+    // The headers view is first, so switch to the dependency view to compare the
+    // displayed module's identity before checking the visible page.
+    auto* ribbon = window.ribbonBar();
+    auto* page = window.findChild<SARibbonCategory*>(QStringLiteral("editorView/dependency-tree"));
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+    if (!ribbon || !page || !stack) {
+        return false;
+    }
+    ribbon->setCurrentIndex(ribbon->categoryIndex(page));
+    QApplication::processEvents();
+    QWidget* current = stack->currentWidget();
+    auto* tree =
+        current ? current->findChild<QTreeView*>(QStringLiteral("dependencyTreeView")) : nullptr;
+    return tree && tree->model() && tree->model()->index(0, 2).data().toString() == identity;
+}
+
+void testDocumentSelector() {
     QTemporaryDir temporary;
     require(temporary.isValid(), "Temporary directory failed");
     const QDir firstDir(temporary.path() + QStringLiteral("/left&part"));
@@ -107,97 +198,254 @@ void testWorkspaceMenu() {
     QSettings().setValue(QStringLiteral("ui/language"), QStringLiteral("en"));
     LanguageManager languages;
     PeViewer window(languages);
-    auto* manager = WorkspaceManager::instance();
-    auto* menu = window.findChild<QMenu*>(QStringLiteral("menuWorkspace"));
-    auto* tree = window.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
+    window.show();
+    QApplication::processEvents();
+    auto* manager = DocumentManager::instance();
+    auto* combo = window.findChild<QComboBox*>(QStringLiteral("documentCombo"));
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+    auto* homePage = window.findChild<QWidget*>(QStringLiteral("homePage"));
     auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
-    require(menu && tree && closeAction && window.menuBar()->actions().contains(menu->menuAction()),
-            "Workspace menu or dependency tree is missing");
-    require(menu->actions().isEmpty() && !menu->isEnabled(), "Empty workspace menu is enabled");
-    require(!closeAction->isEnabled(), "Close is enabled without a current workspace");
+    auto* fileMenu = window.findChild<SARibbonMenu*>(QStringLiteral("ribbonFileMenu"));
+    auto* fileButton = window.findChild<SARibbonApplicationButton*>(QStringLiteral("ribbonApplicationButton"));
+    require(combo && stack && homePage && closeAction && fileMenu && fileButton &&
+                fileMenu->actions().contains(closeAction),
+            "Document selector, view stack or file menu is missing");
+    require(fileButton->width() - fileButton->fontMetrics().horizontalAdvance(fileButton->text()) <= 40,
+            "File button is much wider than its text");
+    require(combo->parentWidget() == window.ribbonBar()->quickAccessBar(),
+            "Document selector is not in the title bar");
+    const QPoint comboTop = combo->mapTo(window.ribbonBar(), QPoint());
+    require(comboTop.y() >= 0 && comboTop.y() + combo->height() <= window.ribbonBar()->titleBarHeight(),
+            "Document selector extends outside the title bar");
+    require(combo->count() == 0 && combo->currentIndex() == -1 && !combo->isEnabled() &&
+                !closeAction->isEnabled(), "Empty document controls are enabled or selected");
+    require(stack->currentWidget() == homePage, "Empty window does not show the home page");
 
-    Workspace* first = manager->open(firstPath, WorkspaceManager::OpenMode::OpenOnly);
-    require(menu->isEnabled() && menu->actions().size() == 1, "Opened workspace is not listed");
-    auto* firstAction = menu->actions().first();
-    require(firstAction->isCheckable() && !firstAction->isChecked() && !closeAction->isEnabled() &&
-                tree->model()->rowCount() == 0,
-            "OpenOnly selected or displayed a workspace");
-    require(firstAction->data().toString() == firstPath &&
-                firstAction->text() == QDir::toNativeSeparators(firstPath).replace('&', "&&"),
-            "Workspace path is missing or its mnemonic is not escaped");
-    firstAction->trigger();
-    require(manager->current() == first && firstAction->isChecked() && closeAction->isEnabled() &&
-                tree->model()->index(0, 2).data().toString() == firstIdentity,
-            "Selecting the workspace did not activate and display it");
+    Document* first = manager->open(firstPath, DocumentManager::OpenMode::OpenOnly);
+    require(combo->isEnabled() && combo->count() == 1 && combo->currentIndex() == -1 &&
+                combo->currentText().isEmpty() && !closeAction->isEnabled() &&
+                stack->currentWidget() == homePage,
+            "OpenOnly selected or displayed a document");
+    require(combo->itemData(0).toString() == firstPath &&
+                combo->itemText(0) == QDir::toNativeSeparators(firstPath),
+            "Document path is missing or its ampersand was changed");
+    selectDocument(combo, 0);
+    require(manager->current() == first && combo->currentData().toString() == firstPath &&
+                closeAction->isEnabled() && displayShowsIdentity(window, firstIdentity),
+            "Selecting a document did not activate and display it");
     require(window.statusBar()->currentMessage() == QStringLiteral("Loaded app.exe: 1 modules"),
-            "Workspace activation did not update the status");
+            "Document activation did not update the status");
 
-    Workspace* second = manager->open(secondPath);
-    require(menu->actions().size() == 2, "Second workspace is not listed");
-    auto* secondAction = menu->actions().last();
-    require(secondAction->isChecked() && !firstAction->isChecked() &&
-                firstAction->text() != secondAction->text() &&
-                tree->model()->index(0, 2).data().toString() == secondIdentity,
-            "Workspaces with the same filename cannot be distinguished or switched");
-    firstAction->trigger();
-    firstAction->trigger();
-    require(manager->current() == first && firstAction->isChecked() && !secondAction->isChecked() &&
-                tree->model()->index(0, 2).data().toString() == firstIdentity,
-            "Menu selection did not switch back to the first workspace");
+    Document* second = manager->open(secondPath);
+    require(combo->count() == 2 && combo->currentData().toString() == secondPath &&
+                combo->itemText(0) != combo->itemText(1) &&
+                displayShowsIdentity(window, secondIdentity),
+            "Documents with the same filename cannot be distinguished");
+    searchDocuments(combo, QStringLiteral("LEFT&PART"));
+    auto* completer = combo->completer();
+    require(manager->current() == second && completer->completionCount() == 1 &&
+                completer->popup()->isVisible(), "Typing did not filter paths without switching documents");
+    completer->popup()->setCurrentIndex(completer->completionModel()->index(0, 0));
+    pressKey(completer->popup(), Qt::Key_Return);
+    require(manager->current() == first && combo->currentData().toString() == firstPath &&
+                combo->currentText() == QDir::toNativeSeparators(firstPath) &&
+                displayShowsIdentity(window, firstIdentity),
+            "Selecting a filtered result did not activate the correct document");
+    searchDocuments(combo, QStringLiteral("RIGHT"));
+    require(completer->completionCount() == 1, "Second document did not match the query");
+    completer->popup()->setCurrentIndex(completer->completionModel()->index(0, 0));
+    pressKey(completer->popup(), Qt::Key_Return);
+    require(manager->current() == second && combo->currentData().toString() == secondPath,
+            "Filtered row zero was not mapped to the correct source document");
+    manager->activate(first);
+
+    searchDocuments(combo, QStringLiteral("APP.EXE"));
+    require(completer->completionCount() == 2, "Filename search did not include all matching documents");
+    pressKey(completer->popup(), Qt::Key_Escape);
+    require(!completer->popup()->isVisible() && manager->current() == first &&
+                combo->currentText() == QDir::toNativeSeparators(firstPath),
+            "Escape did not cancel search and restore the active document");
+    searchDocuments(combo, QStringLiteral("missing-document"));
+    require(completer->completionCount() == 0 && manager->current() == first,
+            "An unmatched query changed the current document");
+    pressKey(combo->lineEdit(), Qt::Key_Return);
+    require(combo->count() == 2 && combo->currentText() == QDir::toNativeSeparators(firstPath),
+            "Invalid input inserted a document or left stale text");
+    searchDocuments(combo, QStringLiteral("left"));
+    // An outside click dismisses the native popup before focus moves to the page.
+    completer->popup()->hide();
+    QWidget* activePage = stack->currentWidget();
+    require(activePage != nullptr, "Active document page is missing");
+    activePage->setFocus();
+    QApplication::processEvents();
+    require(manager->current() == first && combo->currentText() == QDir::toNativeSeparators(firstPath),
+            "Leaving the search field did not restore the current document");
     manager->open(firstPath);
-    require(menu->actions().size() == 2, "Reopening a workspace duplicated its menu item");
+    require(combo->count() == 2, "Reopening a document duplicated its item");
 
     {
         PeViewer otherWindow(languages);
-        auto* otherMenu = otherWindow.findChild<QMenu*>(QStringLiteral("menuWorkspace"));
-        auto* otherTree = otherWindow.findChild<QTreeView*>(QStringLiteral("dependencyTreeView"));
-        require(otherMenu && otherTree && otherMenu->actions().size() == 2 &&
-                    otherMenu->actions().first()->isChecked() &&
-                    otherTree->model()->index(0, 2).data().toString() == firstIdentity,
-                "New window did not load existing workspaces");
-        otherMenu->actions().last()->trigger();
-        require(manager->current() == second && secondAction->isChecked() &&
-                    !firstAction->isChecked() &&
-                    tree->model()->index(0, 2).data().toString() == secondIdentity,
-                "Workspace activation was not synchronized between windows");
+        auto* otherCombo = otherWindow.findChild<QComboBox*>(QStringLiteral("documentCombo"));
+        auto* otherStack = otherWindow.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+        require(otherCombo && otherStack && otherCombo->count() == 2 &&
+                    otherCombo->currentData().toString() == firstPath,
+                "New window did not load existing documents");
+        otherWindow.show();
+        QApplication::processEvents();
+        selectDocument(otherCombo, otherCombo->findData(secondPath));
+        require(manager->current() == second && combo->currentData().toString() == secondPath,
+                "Document activation was not synchronized between windows");
     }
 
     require(languages.setLanguage(QStringLiteral("zh_CN")), "Could not switch to Chinese");
     QApplication::processEvents();
-    require(menu->title() == QStringLiteral("工作区(&W)") && secondAction->isChecked() &&
+    require(combo->lineEdit()->placeholderText() == QStringLiteral("搜索文档...") &&
+                combo->currentData().toString() == secondPath &&
                 window.statusBar()->currentMessage() == QStringLiteral("已加载 app.exe：1 个模块"),
-            "Language switching lost the active workspace or its translated status");
+            "Language switching lost the active document or its translated status");
+    closeAction->trigger();
+    require(manager->current() == first && combo->count() == 1 &&
+                combo->currentData().toString() == firstPath && closeAction->isEnabled() &&
+                displayShowsIdentity(window, firstIdentity),
+            "Closing the current document did not select and display the fallback");
+    second = manager->open(secondPath, DocumentManager::OpenMode::OpenOnly);
+    require(combo->count() == 2 && combo->currentData().toString() == firstPath,
+            "Opening an inactive document changed the selection");
+    searchDocuments(combo, QStringLiteral("right"));
+    require(manager->close(second) && combo->count() == 1 &&
+                combo->currentData().toString() == firstPath &&
+                !completer->popup()->isVisible(),
+            "Closing a search result did not clear the stale popup and preserve selection");
+    manager->open(secondPath, DocumentManager::OpenMode::OpenOnly);
+    manager->closeAll();
+    require(combo->count() == 0 && combo->currentIndex() == -1 && combo->currentText().isEmpty() &&
+                !combo->isEnabled() && !closeAction->isEnabled() && stack->currentWidget() == homePage &&
+                window.statusBar()->currentMessage() == QStringLiteral("就绪"),
+            "Closing all documents did not clear the selector and view pages");
+    manager->open(firstPath);
+    closeAction->trigger();
+    require(manager->empty() && combo->count() == 0 && !combo->isEnabled() &&
+                !closeAction->isEnabled() && stack->currentWidget() == homePage,
+            "Closing the final document did not disable document controls");
+    QSettings().remove(QStringLiteral("ui/language"));
+}
+
+void testEditorViews() {
+    QTemporaryDir temporary;
+    require(temporary.isValid(), "Temporary directory failed");
+    const QDir dir(temporary.path());
+    DependencyTests::writePe(dir, QStringLiteral("editor.exe"));
+    const QString path = dir.filePath(QStringLiteral("editor.exe"));
+
+    QSettings().setValue(QStringLiteral("ui/language"), QStringLiteral("en"));
+    LanguageManager languages;
+    PeViewer window(languages);
+    window.show();
+    QApplication::processEvents();
+
+    auto* ribbon = window.ribbonBar();
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
+    auto* homePage = window.findChild<QWidget*>(QStringLiteral("homePage"));
+    auto* home = window.findChild<SARibbonCategory*>(QStringLiteral("ribbonHome"));
+    auto* closeAction = window.findChild<QAction*>(QStringLiteral("actionClose"));
+    require(ribbon && stack && homePage && home && closeAction, "Editor host widgets are missing");
+    require(window.contentsMargins() == QMargins(0, 0, 0, 0),
+            "Window default margins leave a border around the Ribbon");
+    require(ribbon->x() == 0 && ribbon->width() == window.width(),
+            "Ribbon does not span the full window width");
+    auto* ribbonBorder = window.findChild<QLabel*>(QStringLiteral("ribbonBorder"));
+    require(ribbonBorder && ribbonBorder->height() == 1 &&
+                ribbonBorder->width() == window.centralWidget()->width(),
+            "Ribbon separator line is missing or does not span the window");
+    require(ribbonBorder->y() + ribbonBorder->height() == stack->y(),
+            "Ribbon separator is not directly above the central pages");
+    require(stack->currentWidget() == homePage, "Home page is not shown without documents");
+    require(ribbon->categoryPages().size() == 1, "Unexpected Ribbon tabs without documents");
+
+    auto* manager = DocumentManager::instance();
+    Document* document = manager->open(path);
+    QApplication::processEvents();
+    auto* headersPage = window.findChild<SARibbonCategory*>(QStringLiteral("editorView/headers"));
+    auto* dependencyPage =
+        window.findChild<SARibbonCategory*>(QStringLiteral("editorView/dependency-tree"));
+    require(document && document->editor() && headersPage && dependencyPage &&
+                document->editor()->views().size() == 2,
+            "Opening a document did not create both editor views");
+    require(ribbon->categoryPages().size() == 3, "View tabs were not added next to Home");
+    require(ribbon->categoryByIndex(ribbon->currentIndex()) == headersPage,
+            "The headers view is not the first selected tab");
+    require(headersPage->categoryName() == QStringLiteral("Headers") &&
+                dependencyPage->categoryName() == QStringLiteral("Dependency"),
+            "View tab titles are not translated");
+    require(stack->currentWidget() != homePage, "View page is not displayed");
+    require(stack->count() == 3, "View pages were not added to the stack");
+    require(closeAction->isEnabled(), "Close action is disabled with an open document");
+
+    auto* headersPanel = window.findChild<SARibbonPanel*>(QStringLiteral("headersPanel"));
+    require(headersPanel && headersPanel->panelName() == QStringLiteral("View"),
+            "Headers Ribbon panel is missing or not translated");
+    auto* dosTable = window.findChild<QTableWidget*>(QStringLiteral("dosHeaderTable"));
+    auto* fileTable = window.findChild<QTableWidget*>(QStringLiteral("fileHeaderTable"));
+    auto* optionalTable = window.findChild<QTableWidget*>(QStringLiteral("optionalHeaderTable"));
+    require(dosTable && fileTable && optionalTable, "PE header tables are missing");
+    require(dosTable->rowCount() == 19 && fileTable->rowCount() == 7 &&
+                optionalTable->rowCount() == 30,
+            "PE header tables have unexpected row counts");
+    require(dosTable->item(18, 1)->text() == QStringLiteral("e_lfanew") &&
+                dosTable->item(18, 2)->text() == QStringLiteral("0x00000080"),
+            "DOS header values were not loaded");
+    require(fileTable->item(0, 1)->text() == QStringLiteral("Machine") &&
+                fileTable->item(0, 2)->text() == QStringLiteral("0x014C"),
+            "File header values were not loaded");
+    require(optionalTable->item(0, 1)->text() == QStringLiteral("Magic") &&
+                optionalTable->item(0, 2)->text() == QStringLiteral("0x010B"),
+            "Optional header values were not loaded");
+
+    // Home switches the central page; the view tab restores it.
+    ribbon->setCurrentIndex(ribbon->categoryIndex(home));
+    QApplication::processEvents();
+    require(stack->currentWidget() == homePage, "Home tab did not show the home page");
+    ribbon->setCurrentIndex(ribbon->categoryIndex(headersPage));
+    QApplication::processEvents();
+    require(stack->currentWidget() != homePage, "View tab did not restore the view page");
+    require(stack->currentWidget()->findChild<QTableWidget*>(QStringLiteral("dosHeaderTable")),
+            "The headers view did not restore its page");
+
+    require(languages.setLanguage(QStringLiteral("zh_CN")), "Could not switch to Chinese");
+    QApplication::processEvents();
+    require(headersPage->categoryName() == QStringLiteral("头信息") &&
+                dependencyPage->categoryName() == QStringLiteral("依赖"),
+            "View tabs were not retranslated");
+    auto* dosSection = window.findChild<QWidget*>(QStringLiteral("dosHeaderSection"));
+    auto* dosTitle = dosSection ? dosSection->findChild<QLabel*>(QStringLiteral("headerTableTitle"))
+                                : nullptr;
+    require(dosTitle && dosTitle->text() == QStringLiteral("DOS 头") &&
+                dosTable->horizontalHeaderItem(1)->text() == QStringLiteral("字段") &&
+                headersPanel->panelName() == QStringLiteral("视图"),
+            "PE header tables or Ribbon panel were not retranslated");
+    require(languages.setLanguage(QStringLiteral("en")), "Could not switch to English");
+    QApplication::processEvents();
+    require(headersPage->categoryName() == QStringLiteral("Headers") &&
+                dependencyPage->categoryName() == QStringLiteral("Dependency"),
+            "View tab titles were not restored");
+    require(dosTitle->text() == QStringLiteral("DOS Header") &&
+                dosTable->horizontalHeaderItem(1)->text() == QStringLiteral("Field") &&
+                headersPanel->panelName() == QStringLiteral("View"),
+            "PE header titles were not restored");
 
     closeAction->trigger();
-    require(manager->current() == first && menu->actions().size() == 1 &&
-                firstAction->isChecked() && closeAction->isEnabled() &&
-                tree->model()->index(0, 2).data().toString() == firstIdentity,
-            "Closing the current workspace did not remove its action and display the fallback");
-    second = manager->open(secondPath, WorkspaceManager::OpenMode::OpenOnly);
-    require(menu->actions().size() == 2 && firstAction->isChecked() &&
-                !menu->actions().last()->isChecked(),
-            "Opening an inactive workspace changed the menu selection");
-    require(manager->close(second) && menu->actions().size() == 1 && firstAction->isChecked(),
-            "Closing an inactive workspace did not preserve the menu selection");
-    manager->open(secondPath, WorkspaceManager::OpenMode::OpenOnly);
-    manager->closeAll();
-    require(menu->actions().isEmpty() && !menu->isEnabled() && !closeAction->isEnabled() &&
-                tree->model()->rowCount() == 0 &&
-                window.statusBar()->currentMessage() == QStringLiteral("就绪"),
-            "Closing all workspaces did not clear the menu and dependency tree");
-    manager->open(firstPath);
-    require(closeAction->isEnabled(), "Opening a workspace did not reenable Close");
-    closeAction->trigger();
-    require(manager->empty() && manager->current() == nullptr && !closeAction->isEnabled() &&
-                menu->actions().isEmpty() && !menu->isEnabled() && tree->model()->rowCount() == 0 &&
-                window.statusBar()->currentMessage() == QStringLiteral("就绪"),
-            "Close did not clear the final workspace and disable itself");
+    QApplication::processEvents();
+    require(manager->empty() && !closeAction->isEnabled() && stack->currentWidget() == homePage,
+            "Closing the document did not return to the home page");
+    require(window.ribbonBar()->categoryPages().size() == 1, "View tab was not removed");
+    require(stack->count() == 1, "View page was not released with its document");
     QSettings().remove(QStringLiteral("ui/language"));
 }
 }  // namespace
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+    Q_INIT_RESOURCE(SARibbonResource);
     QCoreApplication::setOrganizationName(QStringLiteral("PeViewerTests"));
     QCoreApplication::setApplicationName(QStringLiteral("UiTranslations"));
     QTemporaryDir settingsDirectory;
@@ -206,10 +454,12 @@ int main(int argc, char* argv[]) {
     }
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory.path());
+    registerPeEditorViews();
 
     try {
         testLanguageSwitching();
-        testWorkspaceMenu();
+        testDocumentSelector();
+        testEditorViews();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

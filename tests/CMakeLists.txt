@@ -13,9 +13,13 @@ foreach(test IN ITEMS api_set module_locator dependency_graph pe_file_store)
     add_test(NAME ${test}_tests COMMAND ${test}_tests)
 endforeach()
 
-add_executable(WorkspaceTests workspace_tests.cpp)
-target_link_libraries(WorkspaceTests PRIVATE workspace)
-add_test(NAME WorkspaceTests COMMAND WorkspaceTests)
+add_executable(EditorTests editor_tests.cpp)
+target_link_libraries(EditorTests PRIVATE editor)
+add_test(NAME EditorTests COMMAND EditorTests)
+
+add_executable(DocumentTests document_tests.cpp)
+target_link_libraries(DocumentTests PRIVATE document)
+add_test(NAME DocumentTests COMMAND DocumentTests)
 
 add_executable(DependencyTreeModelTests
     dependency_tree_model_tests.cpp
@@ -36,6 +40,18 @@ target_link_libraries(DependencyTreeViewTests PRIVATE Qt::Widgets)
 add_test(NAME DependencyTreeViewTests COMMAND DependencyTreeViewTests)
 set_tests_properties(DependencyTreeViewTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(PeHeadersWidgetTests
+    pe_headers_widget_tests.cpp
+    ../src/peviewer/components/pe_headers_widget.cpp
+    ../src/peviewer/components/pe_headers_widget.h
+    ../src/peviewer/components/header_table_widget.cpp
+    ../src/peviewer/components/header_table_widget.h
+)
+target_include_directories(PeHeadersWidgetTests PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
+target_link_libraries(PeHeadersWidgetTests PRIVATE Qt::Widgets parse)
+add_test(NAME PeHeadersWidgetTests COMMAND PeHeadersWidgetTests)
+set_tests_properties(PeHeadersWidgetTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(PeViewerUiTests
     pe_viewer_ui_tests.cpp
     ../src/peviewer/pe_viewer.cpp
@@ -43,6 +59,20 @@ add_executable(PeViewerUiTests
     ../src/peviewer/pe_viewer.ui
     ../src/peviewer/language_manager.cpp
     ../src/peviewer/language_manager.h
+    ../src/peviewer/editor_host.cpp
+    ../src/peviewer/editor_host.h
+    ../src/peviewer/editor_registration.cpp
+    ../src/peviewer/editor_registration.h
+    ../src/peviewer/editors/pe_editor.cpp
+    ../src/peviewer/editors/pe_editor.h
+    ../src/peviewer/editors/dependency_tree_editor_view.cpp
+    ../src/peviewer/editors/dependency_tree_editor_view.h
+    ../src/peviewer/editors/headers_editor_view.cpp
+    ../src/peviewer/editors/headers_editor_view.h
+    ../src/peviewer/components/header_table_widget.cpp
+    ../src/peviewer/components/header_table_widget.h
+    ../src/peviewer/components/pe_headers_widget.cpp
+    ../src/peviewer/components/pe_headers_widget.h
     ../src/peviewer/components/dependency_tree_widget.cpp
     ../src/peviewer/components/dependency_tree_widget.h
     ../src/peviewer/components/dependency_tree_view.cpp
@@ -55,7 +85,7 @@ add_executable(PeViewerUiTests
 )
 set_target_properties(PeViewerUiTests PROPERTIES AUTORCC ON)
 target_include_directories(PeViewerUiTests PRIVATE "${PROJECT_SOURCE_DIR}/src/peviewer")
-target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets workspace)
+target_link_libraries(PeViewerUiTests PRIVATE Qt::Widgets document SARibbonBar::SARibbonBar)
 add_dependencies(PeViewerUiTests peviewer_translations)
 add_test(NAME PeViewerUiTests COMMAND PeViewerUiTests)
 set_tests_properties(PeViewerUiTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

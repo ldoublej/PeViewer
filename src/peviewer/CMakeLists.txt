@@ -9,6 +9,20 @@ set(PROJECT_SOURCES
     pe_viewer.cpp
     language_manager.h
     language_manager.cpp
+    editor_host.h
+    editor_host.cpp
+    editor_registration.h
+    editor_registration.cpp
+    editors/pe_editor.h
+    editors/pe_editor.cpp
+    editors/dependency_tree_editor_view.h
+    editors/dependency_tree_editor_view.cpp
+    editors/headers_editor_view.h
+    editors/headers_editor_view.cpp
+    components/header_table_widget.h
+    components/header_table_widget.cpp
+    components/pe_headers_widget.h
+    components/pe_headers_widget.cpp
     components/dependency_tree_widget.h
     components/dependency_tree_widget.cpp
     components/dependency_tree_view.h
@@ -61,9 +75,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         parse
-        workspace
+        document
         datasource
         dependencies
+        SARibbonBar::SARibbonBar
     PUBLIC
         Qt::Core
         Qt::Gui

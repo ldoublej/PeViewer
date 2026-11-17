@@ -2,8 +2,7 @@
 
 #include <QModelIndex>
 #include <QPainter>
-#include <QStyle>
-#include <QStyleOption>
+#include <QPolygonF>
 #include <QVector>
 
 namespace {
@@ -80,19 +79,27 @@ void DependencyTreeView::drawBranches(QPainter* painter, const QRect& rect,
         painter->drawLine(QPointF(x, centerY), QPointF(x, bottom));
     }
 
-    // 仅绘制展开控件，避免 Qt 再叠加一套原生连接线。
+    // 展开/收起三角自绘：平台样式的 PE_IndicatorBranch 在 Ribbon 主题下不显示，
+    // 直接画可以保证任何主题、任何 DPI 下都能看到。
     if (hasChildren) {
-        QStyleOption option;
-        option.initFrom(this);
-        option.rect = QRect(qRound(columnX(columns - 1)) - 4, qRound(centerY) - 4, 9, 9);
-        option.state &= ~(QStyle::State_Item | QStyle::State_Sibling |
-                          QStyle::State_Selected | QStyle::State_MouseOver |
-                          QStyle::State_HasFocus);
-        option.state |= QStyle::State_Children;
+        const qreal centerX = columnX(columns - 1);
+        QPolygonF arrow;
         if (isExpanded(index)) {
-            option.state |= QStyle::State_Open;
+            arrow << QPointF(centerX - 4, centerY - 2.5) << QPointF(centerX + 4, centerY - 2.5)
+                  << QPointF(centerX, centerY + 3.5);
+        } else if (rtl) {
+            arrow << QPointF(centerX + 2.5, centerY - 4) << QPointF(centerX - 3.5, centerY)
+                  << QPointF(centerX + 2.5, centerY + 4);
+        } else {
+            arrow << QPointF(centerX - 2.5, centerY - 4) << QPointF(centerX + 3.5, centerY)
+                  << QPointF(centerX - 2.5, centerY + 4);
         }
-        style()->drawPrimitive(QStyle::PE_IndicatorBranch, &option, painter, this);
+        QColor arrowColor = palette().color(QPalette::Text);
+        arrowColor.setAlpha(170);
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(arrowColor);
+        painter->drawPolygon(arrow);
     }
     painter->restore();
 }
